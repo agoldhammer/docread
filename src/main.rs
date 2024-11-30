@@ -3,6 +3,7 @@ use docx_rs::*;
 use glob::glob;
 use serde_json::Value;
 use std::io::Read;
+use std::path::Path;
 
 // taken from https://betterprogramming.pub/how-to-parse-microsoft-word-documents-docx-in-rust-d62a4f56ba94
 
@@ -10,10 +11,10 @@ use std::io::Read;
 #[command(author, version, about, long_about = None)]
 struct Args {
     #[arg(short, long)]
-    name: String,
+    regex: String,
 }
 
-fn parse_docx(file_name: &str) -> anyhow::Result<()> {
+fn parse_docx(file_name: &Path) -> anyhow::Result<()> {
     let data: Value = serde_json::from_str(&read_docx(&read_to_vec(file_name)?)?.json())?;
     // println!("data: {:#?}\n\n", data);
     if let Some(children) = data["document"]["children"].as_array() {
@@ -40,9 +41,9 @@ fn read_children(node: &Value) {
     }
 }
 
-fn read_to_vec(file_name: &str) -> anyhow::Result<Vec<u8>> {
+fn read_to_vec(path: &Path) -> anyhow::Result<Vec<u8>> {
     let mut buf = Vec::new();
-    std::fs::File::open(file_name)?.read_to_end(&mut buf)?;
+    std::fs::File::open(path)?.read_to_end(&mut buf)?;
     Ok(buf)
 }
 
@@ -53,12 +54,13 @@ fn main() -> anyhow::Result<()> {
             Ok(path) => {
                 println!("Parsing--> {}", path.display());
                 // parse_docx(&path.display().to_string())?;
-                parse_docx(path.as_path());
+                parse_docx(path.as_path())?;
             }
             Err(e) => eprintln!("{:?}", e),
         }
     }
     let args = Args::parse();
-    parse_docx(&args.name)?;
+    println!("regex: {:#?}\n\n", args.regex);
+    // parse_docx(&args.name)?;
     Ok(())
 }
