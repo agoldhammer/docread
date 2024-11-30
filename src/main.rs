@@ -1,6 +1,7 @@
 use clap::Parser;
 use docx_rs::*;
 use glob::glob;
+use regex::Regex;
 use serde_json::Value;
 use std::io::Read;
 use std::path::Path;
@@ -14,19 +15,19 @@ struct Args {
     regex: String,
 }
 
-fn parse_docx(file_name: &Path, search_str: &str) -> anyhow::Result<()> {
+fn parse_docx(file_name: &Path, search_re: &Regex) -> anyhow::Result<()> {
     let data: Value = serde_json::from_str(&read_docx(&read_to_vec(file_name)?)?.json())?;
     // println!("data: {:#?}\n\n", data);
     if let Some(children) = data["document"]["children"].as_array() {
         // println! {"children: {:#?}\n\n", children};
         children
             .iter()
-            .for_each(|child| read_children(child, search_str));
+            .for_each(|child| read_children(child, search_re));
     }
     Ok(())
 }
 
-fn read_children(node: &Value, search_str: &str) {
+fn read_children(node: &Value, search_re: &Regex) {
     if let Some(children) = node["data"]["children"].as_array() {
         children.iter().for_each(|child| {
             if child["type"] != "text" {
@@ -35,10 +36,10 @@ fn read_children(node: &Value, search_str: &str) {
                 //     child["type"], child["data"]
                 // );
                 // println!("recursing on type {}...", child["type"]);
-                read_children(child, search_str);
+                read_children(child, search_re);
             } else {
                 let text = child["data"]["text"].as_str().unwrap();
-                if text.contains(search_str) {
+                if search_re.is_match(text) {
                     println!("found match: {}", text);
                 }
                 // println!("text: {}\n", child["data"]["text"]);
@@ -56,12 +57,13 @@ fn read_to_vec(path: &Path) -> anyhow::Result<Vec<u8>> {
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     println!("regex: {:#?}\n\n", args.regex);
+    let re = Regex::new(&args.regex).unwrap();
     let files = glob("**/*.docx")?;
     for file in files {
         match file {
             Ok(path) => {
                 println!("\n*Parsing--> {}", path.display());
-                parse_docx(path.as_path(), &args.regex)?;
+                parse_docx(path.as_path(), &re)?;
             }
             Err(e) => eprintln!("{:?}", e),
         }
