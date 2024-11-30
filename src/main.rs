@@ -1,5 +1,6 @@
 use clap::Parser;
 use docx_rs::*;
+use glob::glob;
 use serde_json::Value;
 use std::io::Read;
 
@@ -14,7 +15,9 @@ struct Args {
 
 fn parse_docx(file_name: &str) -> anyhow::Result<()> {
     let data: Value = serde_json::from_str(&read_docx(&read_to_vec(file_name)?)?.json())?;
+    // println!("data: {:#?}\n\n", data);
     if let Some(children) = data["document"]["children"].as_array() {
+        // println! {"children: {:#?}\n\n", children};
         children.iter().for_each(read_children);
     }
     Ok(())
@@ -24,9 +27,14 @@ fn read_children(node: &Value) {
     if let Some(children) = node["data"]["children"].as_array() {
         children.iter().for_each(|child| {
             if child["type"] != "text" {
+                // println!(
+                //     "---->type: {}; data: {:#?}\n;",
+                //     child["type"], child["data"]
+                // );
+                println!("recursing on type {}...", child["type"]);
                 read_children(child);
             } else {
-                println!("{}", child["data"]["text"]);
+                println!("text: {}\n", child["data"]["text"]);
             }
         });
     }
@@ -39,6 +47,17 @@ fn read_to_vec(file_name: &str) -> anyhow::Result<Vec<u8>> {
 }
 
 fn main() -> anyhow::Result<()> {
+    let files = glob("**/*.docx")?;
+    for file in files {
+        match file {
+            Ok(path) => {
+                println!("Parsing--> {}", path.display());
+                // parse_docx(&path.display().to_string())?;
+                parse_docx(path.as_path());
+            }
+            Err(e) => eprintln!("{:?}", e),
+        }
+    }
     let args = Args::parse();
     parse_docx(&args.name)?;
     Ok(())
