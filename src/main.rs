@@ -40,7 +40,7 @@ fn read_children(node: &Value, search_re: &Regex) {
             } else {
                 let text = child["data"]["text"].as_str().unwrap();
                 if search_re.is_match(text) {
-                    println!("found match: {}", text);
+                    println!("***found match: {}\n", text);
                 }
                 // println!("text: {}\n", child["data"]["text"]);
             }
