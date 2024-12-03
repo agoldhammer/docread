@@ -3,8 +3,14 @@ use docx_rs::*;
 use glob::glob;
 use regex::Regex;
 use serde_json::Value;
+// use std::cell::RefCell;
 use std::io::Read;
 use std::path::Path;
+// use std::rc::Rc;
+
+type Run = String;
+type Runs = Vec<Run>;
+// type RcRuns = Rc<RefCell<Runs>>;
 
 // taken from https://betterprogramming.pub/how-to-parse-microsoft-word-documents-docx-in-rust-d62a4f56ba94
 
@@ -17,35 +23,40 @@ struct Args {
 
 fn parse_docx(file_name: &Path, search_re: &Regex) -> anyhow::Result<()> {
     let data: Value = serde_json::from_str(&read_docx(&read_to_vec(file_name)?)?.json())?;
-    // println!("data: {:#?}\n\n", data);
     if let Some(children) = data["document"]["children"].as_array() {
-        // println! {"children: {:#?}\n\n", children};
-        children
-            .iter()
-            .for_each(|child| read_children(child, search_re));
+        // println!("children: {:#?}\n\n", children);
+        children.iter().for_each(|child| {
+            let matched_runs = proc_children(child, search_re);
+            for run in matched_runs {
+                println!("{}", run);
+            }
+        })
     }
     Ok(())
 }
 
-fn read_children(node: &Value, search_re: &Regex) {
+fn proc_children(node: &Value, search_re: &Regex) -> Runs {
+    let mut result = Runs::new();
     if let Some(children) = node["data"]["children"].as_array() {
-        children.iter().for_each(|child| {
-            if child["type"] != "text" {
-                // println!(
-                //     "---->type: {}; data: {:#?}\n;",
-                //     child["type"], child["data"]
-                // );
-                // println!("recursing on type {}...", child["type"]);
-                read_children(child, search_re);
-            } else {
-                let text = child["data"]["text"].as_str().unwrap();
-                if search_re.is_match(text) {
-                    println!("***found match: {}\n", text);
+        result = children
+            .iter()
+            .map(|child| {
+                if child["type"] != "text" {
+                    proc_children(child, search_re).concat()
+                } else {
+                    let text = child["data"]["text"].as_str().unwrap();
+                    if search_re.is_match(text) {
+                        text.to_string()
+                    } else {
+                        "*nomatch*".to_string()
+                    }
                 }
-                // println!("text: {}\n", child["data"]["text"]);
-            }
-        });
+            })
+            .filter(|s| s.len() > 0)
+            .filter(|s| s != "*nomatch*")
+            .collect();
     }
+    result
 }
 
 fn read_to_vec(path: &Path) -> anyhow::Result<Vec<u8>> {
