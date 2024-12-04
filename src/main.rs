@@ -25,7 +25,7 @@ fn parse_docx(file_name: &Path, search_re: &Regex) -> anyhow::Result<()> {
         children.iter().for_each(|child| {
             let matched_runs = proc_children(child, search_re);
             for run in matched_runs {
-                println!("{}", run);
+                println!("-> {}", run);
             }
         })
     }
