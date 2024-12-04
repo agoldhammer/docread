@@ -71,7 +71,10 @@ fn main() -> anyhow::Result<()> {
         match file {
             Ok(path) => {
                 println!("\n*Parsing--> {}", path.display());
-                parse_docx(path.as_path(), &re)?;
+                match parse_docx(path.as_path(), &re) {
+                    Ok(()) => {}
+                    Err(e) => eprintln!("{:?}", e),
+                };
             }
             Err(e) => eprintln!("{:?}", e),
         }
