@@ -33,7 +33,6 @@ fn xtract_text_from_doctree(root: &Value, search_re: &Regex) -> Runs {
     let mut queue = VecDeque::new();
     let mut matching_runs = Vec::new();
     if let Some(children) = root["document"]["children"].as_array() {
-        // println!("init children: {:#?}\n\n", children);
         for child in children {
             queue.push_back(child);
         }
@@ -41,12 +40,10 @@ fn xtract_text_from_doctree(root: &Value, search_re: &Regex) -> Runs {
     while let Some(child) = queue.pop_front() {
         if child["type"] == "text" {
             let text = child["data"]["text"].as_str().unwrap();
-            // println!("xtract {}", text);
             if search_re.is_match(text) {
                 matching_runs.push(text.to_string());
             }
         } else {
-            // println!("pushing back child type: {:#?}\n", child["type"]);
             if let Some(children) = child["data"]["children"].as_array() {
                 for child in children {
                     queue.push_back(child);
