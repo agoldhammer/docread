@@ -24,6 +24,18 @@ struct Args {
     regex: String,
 }
 
+/// Parses a DOCX file specified by `file_name` and extracts text that matches the given regular
+/// expression `search_re`.
+///
+/// # Arguments
+///
+/// * `file_name` - A reference to the path of the DOCX file to be parsed.
+/// * `search_re` - A reference to the regular expression used to find matching text within the DOCX file.
+///
+/// # Returns
+///
+/// * `anyhow::Result<Runs>` - A result containing a vector of text runs that match the regular expression,
+///   or an error if the parsing or reading process fails.
 fn parse_docx(file_name: &Path, search_re: &Regex) -> anyhow::Result<Runs> {
     let data: Value = serde_json::from_str(&read_docx(&read_to_vec(file_name)?)?.json())?;
     let matched_runs = xtract_text_from_doctree(&data, search_re);
@@ -33,6 +45,17 @@ fn parse_docx(file_name: &Path, search_re: &Regex) -> anyhow::Result<Runs> {
     Ok(matched_runs)
 }
 
+/// Recursively traverse the JSON representation of a DOCX file, extracting all text runs that match
+/// the given regular expression `search_re`.
+///
+/// # Arguments
+///
+/// * `root` - The JSON representation of the DOCX file, as a `serde_json::Value`.
+/// * `search_re` - A reference to the regular expression used to find matching text within the DOCX file.
+///
+/// # Returns
+///
+/// * `Runs` - A vector of text runs that match the regular expression.
 fn xtract_text_from_doctree(root: &Value, search_re: &Regex) -> Runs {
     let mut queue = VecDeque::new();
     let mut matching_runs = Vec::new();
@@ -47,44 +70,57 @@ fn xtract_text_from_doctree(root: &Value, search_re: &Regex) -> Runs {
             if search_re.is_match(text) {
                 matching_runs.push(text.to_string());
             }
-        } else {
-            if let Some(children) = child["data"]["children"].as_array() {
-                for child in children {
-                    queue.push_back(child);
-                }
+        } else if let Some(children) = child["data"]["children"].as_array() {
+            for child in children {
+                queue.push_back(child);
             }
         }
     }
     matching_runs
 }
 
+/// Reads the contents of a file at the given `path` into a vector of bytes.
+///
+/// # Errors
+///
+/// Will return an error if the file cannot be opened or read to the end.
 fn read_to_vec(path: &Path) -> anyhow::Result<Vec<u8>> {
     let mut buf = Vec::new();
     std::fs::File::open(path)?.read_to_end(&mut buf)?;
     Ok(buf)
 }
 
+/// Process each file in the given `files` vector by attempting to parse it using the given
+/// regular expression `search_re`. The results are collected into a vector of `SearchResult`s.
+///
+/// # Arguments
+///
+/// * `files` - A vector of file paths to be processed.
+/// * `search_re` - A reference to the regular expression used to find matching text within the DOCX files.
+///
+/// # Returns
+///
+/// * `Vec<SearchResult>` - A vector of `SearchResult`s containing the file name and the result of
+///   parsing the file, if successful, or an error if the parsing or reading process fails.
 fn process_files(files: Vec<PathBuf>, search_re: &Regex) -> Vec<SearchResult> {
     let mut results = Vec::<SearchResult>::new();
     files.iter().for_each(|file| {
         // println!("\n*Parsing--> {}\n===", file.display());
-        let result = parse_docx(file.as_path(), &search_re);
+        let result = parse_docx(file.as_path(), search_re);
         let search_result = SearchResult {
             file_name: file.display().to_string(),
             maybe_result: result,
         };
         results.push(search_result);
     });
-    // match result {
-    //     Ok(runs) => results.push(runs),
-    //     Err(e) => eprintln!("{:?}", e),
-    // };
-    // results.iter().for_each(|runs| {
-    //     println!("\n\n===");
-    //     runs.iter().for_each(|run| println!("{:?}", run));
-    // })
     results
 }
+/// Search for the given regular expression in all .docx files in the current directory,
+/// and all subdirectories.
+///
+/// # Example
+///
+///
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     println!("regex: {:#?}\n\n", args.regex);
