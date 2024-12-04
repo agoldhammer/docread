@@ -66,7 +66,12 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     println!("regex: {:#?}\n\n", args.regex);
     let re = Regex::new(&args.regex).unwrap();
-    let files = glob("**/*.docx")?;
+    let mut files = Vec::new();
+    let fnames = glob("**/*.docx")?;
+    for fname in fnames {
+        files.push(fname);
+    }
+    println!("Searching {} files", files.len());
     for file in files {
         match file {
             Ok(path) => {
