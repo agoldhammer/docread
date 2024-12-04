@@ -1,6 +1,7 @@
 use clap::Parser;
 use docx_rs::*;
 use glob::glob;
+use rayon::prelude::*;
 use regex::Regex;
 use serde_json::Value;
 use std::collections::VecDeque;
@@ -103,16 +104,20 @@ fn read_to_vec(path: &Path) -> anyhow::Result<Vec<u8>> {
 /// * `Vec<SearchResult>` - A vector of `SearchResult`s containing the file name and the result of
 ///   parsing the file, if successful, or an error if the parsing or reading process fails.
 fn process_files(files: Vec<PathBuf>, search_re: &Regex) -> Vec<SearchResult> {
-    let mut results = Vec::<SearchResult>::new();
-    files.iter().for_each(|file| {
-        // println!("\n*Parsing--> {}\n===", file.display());
-        let result = parse_docx(file.as_path(), search_re);
-        let search_result = SearchResult {
-            file_name: file.display().to_string(),
-            maybe_result: result,
-        };
-        results.push(search_result);
-    });
+    // let mut results = Vec::<SearchResult>::new();
+    let results = files
+        .par_iter()
+        .map(|file| {
+            // println!("\n*Parsing--> {}\n===", file.display());
+            let result = parse_docx(file.as_path(), search_re);
+            let search_result = SearchResult {
+                file_name: file.display().to_string(),
+                maybe_result: result,
+            };
+            search_result
+            // results.push(search_result);
+        })
+        .collect();
     results
 }
 /// Search for the given regular expression in all .docx files in the current directory,
@@ -135,7 +140,7 @@ fn main() -> anyhow::Result<()> {
             Err(e) => eprintln!("{:?}", e),
         }
     }
-    println!("Searching {} files", files.len());
+    let nfiles = files.len();
     let search_results = process_files(files, &re);
 
     for result in search_results {
@@ -149,6 +154,7 @@ fn main() -> anyhow::Result<()> {
             Err(e) => eprintln!("{:?}", e),
         }
     }
+    println!("\nBye! Searched {} files", nfiles);
 
     Ok(())
 }
