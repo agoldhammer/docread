@@ -6,13 +6,10 @@ use serde_json::Value;
 // use std::cell::RefCell;
 use std::io::Read;
 use std::path::Path;
-// use std::rc::Rc;
-
 type Run = String;
 type Runs = Vec<Run>;
-// type RcRuns = Rc<RefCell<Runs>>;
 
-// taken from https://betterprogramming.pub/how-to-parse-microsoft-word-documents-docx-in-rust-d62a4f56ba94
+// modified from https://betterprogramming.pub/how-to-parse-microsoft-word-documents-docx-in-rust-d62a4f56ba94
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -79,6 +76,5 @@ fn main() -> anyhow::Result<()> {
             Err(e) => eprintln!("{:?}", e),
         }
     }
-    // parse_docx(&args.name)?;
     Ok(())
 }
