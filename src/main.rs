@@ -1,4 +1,5 @@
 use clap::Parser;
+use colored::Colorize;
 use docx_rs::*;
 use glob::glob;
 use rayon::prelude::*;
@@ -138,11 +139,12 @@ fn main() -> anyhow::Result<()> {
     let search_results = process_files(files, &re);
 
     for result in search_results {
-        println!("=== Searched--> {}\n", result.file_name);
+        println!("=== Searched--> {}\n", result.file_name.bright_red());
         match result.maybe_result {
             Ok(runs) => {
                 for (index, run) in runs.iter().enumerate() {
-                    println!("Match: {}-> {}\n", index + 1, run);
+                    let prompt = format!("{}", index + 1);
+                    println!("Match: {}-> {}\n", prompt.bright_yellow().on_blue(), run);
                 }
             }
             Err(e) => eprintln!("{:?}", e),
