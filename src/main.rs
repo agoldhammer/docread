@@ -6,6 +6,7 @@ use rayon::prelude::*;
 use regex::Regex;
 use serde_json::Value;
 use std::collections::VecDeque;
+use std::fmt::{self, Display, Formatter};
 use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
@@ -32,6 +33,12 @@ impl FromIterator<String> for MatchTriple {
             iter.next().unwrap_or_default(),
             iter.next().unwrap_or_default(),
         )
+    }
+}
+
+impl Display for MatchTriple {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}{}{}", self.0, self.1.red(), self.2)
     }
 }
 
@@ -203,13 +210,7 @@ fn main() -> anyhow::Result<()> {
                     //     println!("Matches: {:?}\n", mtriples);
                     for (match_index, mtriple) in mtriples.iter().enumerate() {
                         let prompt = format!("{}-{}", run_index + 1, match_index + 1);
-                        println!(
-                            "  {}-> {}{}{}\n",
-                            prompt.bright_yellow().on_blue(),
-                            mtriple.0,
-                            mtriple.1.red(),
-                            mtriple.2
-                        );
+                        println!("  {}-> {}\n", prompt.bright_yellow().on_blue(), mtriple);
                     }
                 }
             }
