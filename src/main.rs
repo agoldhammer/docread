@@ -101,7 +101,6 @@ fn read_to_vec(path: &Path) -> anyhow::Result<Vec<u8>> {
 /// * `Vec<SearchResult>` - A vector of `SearchResult`s containing the file name and the result of
 ///   parsing the file, if successful, or an error if the parsing or reading process fails.
 fn process_files(files: Vec<PathBuf>, search_re: &Regex) -> Vec<SearchResult> {
-    // let mut results = Vec::<SearchResult>::new();
     let results = files
         .par_iter()
         .map(|file| {
