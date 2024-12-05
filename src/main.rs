@@ -123,7 +123,7 @@ fn process_files(files: Vec<PathBuf>, search_re: &Regex) -> Vec<SearchResult> {
 /// Search for the given regular expression in all .docx files in the current directory,
 /// and all subdirectories.
 ///
-/// # Example
+/// # Example: docread --regex "Hi|[Hh]ello"
 ///
 ///
 fn main() -> anyhow::Result<()> {
