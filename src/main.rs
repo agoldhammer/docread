@@ -40,9 +40,6 @@ struct Args {
 fn parse_docx(file_name: &Path, search_re: &Regex) -> anyhow::Result<Runs> {
     let data: Value = serde_json::from_str(&read_docx(&read_to_vec(file_name)?)?.json())?;
     let matched_runs = xtract_text_from_doctree(&data, search_re);
-    // for (index, run) in matched_runs.iter().enumerate() {
-    //     println!("Match: {}-> {}\n", index + 1, run);
-    // }
     Ok(matched_runs)
 }
 
@@ -108,14 +105,12 @@ fn process_files(files: Vec<PathBuf>, search_re: &Regex) -> Vec<SearchResult> {
     let results = files
         .par_iter()
         .map(|file| {
-            // println!("\n*Parsing--> {}\n===", file.display());
             let result = parse_docx(file.as_path(), search_re);
             let search_result = SearchResult {
                 file_name: file.display().to_string(),
                 maybe_result: result,
             };
             search_result
-            // results.push(search_result);
         })
         .collect();
     results
