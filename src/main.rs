@@ -16,6 +16,24 @@ struct SearchResult {
     file_name: String,
     maybe_result: anyhow::Result<Runs>,
 }
+#[derive(Debug)]
+#[allow(dead_code)]
+struct MatchTriple(
+    String, //preamble
+    String, //matched
+    String, //postamble
+);
+
+impl FromIterator<String> for MatchTriple {
+    fn from_iter<T: IntoIterator<Item = String>>(iter: T) -> Self {
+        let mut iter = iter.into_iter();
+        MatchTriple(
+            iter.next().unwrap_or_default(),
+            iter.next().unwrap_or_default(),
+            iter.next().unwrap_or_default(),
+        )
+    }
+}
 
 // modified from https://betterprogramming.pub/how-to-parse-microsoft-word-documents-docx-in-rust-d62a4f56ba94
 
@@ -115,6 +133,38 @@ fn process_files(files: Vec<PathBuf>, search_re: &Regex) -> Vec<SearchResult> {
         .collect();
     results
 }
+
+fn segment_on_regex(s: &str, re: &Regex) -> Vec<MatchTriple> {
+    let mut segments = Vec::new();
+    let mut start = 0;
+    let mut end;
+    let mut end_of_prev_match = 0usize;
+    for m in re.find_iter(s) {
+        end = m.start();
+        if end_of_prev_match > 0 {
+            segments.push(s[end_of_prev_match..end].to_string());
+        }
+        segments.push(s[start..end].to_string());
+        let matched = m.as_str().to_string();
+        end_of_prev_match = m.end();
+        start = end + matched.len();
+        segments.push(matched);
+        // segments.push(s[end..start].to_string());
+    }
+    if start < s.len() {
+        segments.push(s[start..].to_string());
+    }
+    let mut triples: Vec<MatchTriple> = Vec::new();
+    while segments.len() >= 3 {
+        let triple_iter = segments.iter().take(3);
+        let triple: Vec<String> = triple_iter.map(|s| s.to_owned()).collect();
+        let mtriple = MatchTriple::from_iter(triple);
+        triples.push(mtriple);
+        segments = segments.iter().skip(3).map(|s| s.to_owned()).collect();
+    }
+    triples
+}
+
 /// Search for the given regular expression in all .docx files in the current directory,
 /// and all subdirectories.
 ///
@@ -142,9 +192,25 @@ fn main() -> anyhow::Result<()> {
         println!("=== Searched--> {}\n", result.file_name.bright_red());
         match result.maybe_result {
             Ok(runs) => {
-                for (index, run) in runs.iter().enumerate() {
-                    let prompt = format!("{}", index + 1);
-                    println!("Match: {}-> {}\n", prompt.bright_yellow().on_blue(), run);
+                for (run_index, run) in runs.iter().enumerate() {
+                    //     let prompt = format!("{}", index + 1);
+                    //     println!("Match: {}-> {}\n", prompt.bright_yellow().on_blue(), run);
+                    //     let indices = re.find_iter(run);
+                    //     for index in indices {
+                    //         println!("Index: {:?}\n", index);
+                    //     }
+                    let mtriples = segment_on_regex(run, &re);
+                    //     println!("Matches: {:?}\n", mtriples);
+                    for (match_index, mtriple) in mtriples.iter().enumerate() {
+                        let prompt = format!("{}-{}", run_index + 1, match_index + 1);
+                        println!(
+                            "  {}-> {}{}{}\n",
+                            prompt.bright_yellow().on_blue(),
+                            mtriple.0,
+                            mtriple.1.red(),
+                            mtriple.2
+                        );
+                    }
                 }
             }
             Err(e) => eprintln!("{:?}", e),
@@ -153,4 +219,45 @@ fn main() -> anyhow::Result<()> {
     println!("\nBye! Searched {} files", nfiles);
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_segment_on_regex() {
+        let s = "Hello, world!";
+        let re = Regex::new(r"[Hh]ello").unwrap();
+        let mtriples = segment_on_regex(s, &re);
+        println!("{:?}", mtriples);
+        assert_eq!(mtriples.len(), 1);
+        assert_eq!(mtriples[0].0, "");
+        assert_eq!(mtriples[0].1, "Hello");
+        assert_eq!(mtriples[0].2, ", world!");
+    }
+
+    #[test]
+    fn test_segment_on_regex_multi() {
+        let s = "This, that, and the other thing";
+        let re = Regex::new(r"[Tt]h").unwrap();
+        let mtriples = segment_on_regex(s, &re);
+        println!("{:?}", mtriples);
+        assert_eq!(mtriples.len(), 5);
+        assert_eq!(mtriples[0].0, "");
+        assert_eq!(mtriples[0].1, "Th");
+        assert_eq!(mtriples[0].2, "is, ");
+        assert_eq!(mtriples[1].0, "is, ");
+        assert_eq!(mtriples[1].1, "th");
+        assert_eq!(mtriples[1].2, "at, and ");
+        assert_eq!(mtriples[2].0, "at, and ");
+        assert_eq!(mtriples[2].1, "th");
+        assert_eq!(mtriples[2].2, "e o");
+        assert_eq!(mtriples[3].0, "e o");
+        assert_eq!(mtriples[3].1, "th");
+        assert_eq!(mtriples[3].2, "er ");
+        assert_eq!(mtriples[4].0, "er ");
+        assert_eq!(mtriples[4].1, "th");
+        assert_eq!(mtriples[4].2, "ing");
+    }
 }
