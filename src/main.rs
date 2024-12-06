@@ -214,14 +214,7 @@ fn main() -> anyhow::Result<()> {
         match result.maybe_result {
             Ok(runs) => {
                 for (run_index, run) in runs.iter().enumerate() {
-                    //     let prompt = format!("{}", index + 1);
-                    //     println!("Match: {}-> {}\n", prompt.bright_yellow().on_blue(), run);
-                    //     let indices = re.find_iter(run);
-                    //     for index in indices {
-                    //         println!("Index: {:?}\n", index);
-                    //     }
                     let mtriples = segment_on_regex(run, &re);
-                    //     println!("Matches: {:?}\n", mtriples);
                     for (match_index, mtriple) in mtriples.iter().enumerate() {
                         let prompt = format!("{}-{}", run_index + 1, match_index + 1);
                         println!("  {}-> {}\n", prompt.bright_yellow().on_blue(), mtriple);
