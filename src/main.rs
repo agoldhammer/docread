@@ -178,7 +178,7 @@ fn segment_on_regex(s: &str, re: &Regex) -> Vec<MatchTriple> {
         segments.push(s[start..].to_string());
     }
     let mut triples: Vec<MatchTriple> = Vec::new();
-    let _ = &segments.chunks(3).for_each(|chunk| {
+    segments.chunks(3).for_each(|chunk| {
         let triple: Vec<String> = chunk.iter().map(|s| s.to_owned()).collect();
         let mtriple = MatchTriple::from_iter(triple);
         triples.push(mtriple);
