@@ -26,6 +26,17 @@ struct MatchTriple(
 );
 
 impl FromIterator<String> for MatchTriple {
+    /// Creates a new `MatchTriple` from an iterator of `String`s.
+    ///
+    /// The first element of the iterator becomes the preamble, the second element
+    /// becomes the matched text, and the third element becomes the postamble.
+    ///
+    /// If the iterator does not contain enough elements, empty strings are used for
+    /// any missing elements.
+    ///
+    /// # Example
+    ///
+    ///
     fn from_iter<T: IntoIterator<Item = String>>(iter: T) -> Self {
         let mut iter = iter.into_iter();
         MatchTriple(
@@ -141,6 +152,12 @@ fn process_files(files: Vec<PathBuf>, search_re: &Regex) -> Vec<SearchResult> {
     results
 }
 
+/// Segment the given string `s` into a vector of `MatchTriple`s based on the matches of the
+/// regular expression `re`. The first element of each `MatchTriple` is the text preceding the
+/// match, the second element is the matched text itself, and the third element is the text
+/// following the match. If the regular expression matches the beginning of the string, the first
+/// element of the `MatchTriple` will be an empty string. If the regular expression matches the end
+/// of the string, the third element of the `MatchTriple` will be an empty string.
 fn segment_on_regex(s: &str, re: &Regex) -> Vec<MatchTriple> {
     let mut segments = Vec::new();
     let mut start = 0;
@@ -156,19 +173,16 @@ fn segment_on_regex(s: &str, re: &Regex) -> Vec<MatchTriple> {
         end_of_prev_match = m.end();
         start = end + matched.len();
         segments.push(matched);
-        // segments.push(s[end..start].to_string());
     }
     if start < s.len() {
         segments.push(s[start..].to_string());
     }
     let mut triples: Vec<MatchTriple> = Vec::new();
-    while segments.len() >= 3 {
-        let triple_iter = segments.iter().take(3);
-        let triple: Vec<String> = triple_iter.map(|s| s.to_owned()).collect();
+    let _ = &segments.chunks(3).for_each(|chunk| {
+        let triple: Vec<String> = chunk.iter().map(|s| s.to_owned()).collect();
         let mtriple = MatchTriple::from_iter(triple);
         triples.push(mtriple);
-        segments = segments.iter().skip(3).map(|s| s.to_owned()).collect();
-    }
+    });
     triples
 }
 
