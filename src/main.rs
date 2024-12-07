@@ -8,6 +8,7 @@ use serde_json::Value;
 use std::collections::VecDeque;
 use std::fmt::{self, Display, Formatter};
 use std::io::Read;
+use std::sync::Arc;
 
 type Run = String;
 type Runs = Vec<Run>;
@@ -135,7 +136,7 @@ fn read_to_vec(path: &str) -> anyhow::Result<Vec<u8>> {
 ///
 /// * `Vec<SearchResult>` - A vector of `SearchResult`s containing the file name and the result of
 ///   parsing the file, if successful, or an error if the parsing or reading process fails.
-fn process_files(fnames: Vec<String>, search_re: &Regex) -> Vec<SearchResult> {
+fn process_files(fnames: Vec<Arc<String>>, search_re: &Regex) -> Vec<SearchResult> {
     let results = fnames
         .par_iter()
         .map(|file| {
@@ -195,11 +196,12 @@ fn main() -> anyhow::Result<()> {
     println!("regex: {:#?}\n\n", args.regex);
     let re = Regex::new(&args.regex).unwrap();
     let fpaths = glob("**/*.docx")?;
-    let fnames: Vec<String> = fpaths
+    let fnames: Vec<Arc<String>> = fpaths
         .into_iter()
         .filter(|f| f.is_ok())
         .map(|f| f.unwrap())
         .map(|p| format!("{}", p.display()))
+        .map(|s| Arc::new(s))
         .collect();
     let search_results = process_files(fnames, &re);
 
