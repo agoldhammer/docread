@@ -8,8 +8,6 @@ use serde_json::Value;
 use std::collections::VecDeque;
 use std::fmt::{self, Display, Formatter};
 use std::io::Read;
-use std::path::Path;
-use std::path::PathBuf;
 
 type Run = String;
 type Runs = Vec<Run>;
@@ -67,14 +65,14 @@ struct Args {
 ///
 /// # Arguments
 ///
-/// * `file_name` - A reference to the path of the DOCX file to be parsed.
+/// * `file_name` - A reference to the name of the DOCX file to be parsed.
 /// * `search_re` - A reference to the regular expression used to find matching text within the DOCX file.
 ///
 /// # Returns
 ///
 /// * `anyhow::Result<Runs>` - A result containing a vector of text runs that match the regular expression,
 ///   or an error if the parsing or reading process fails.
-fn parse_docx(file_name: &Path, search_re: &Regex) -> anyhow::Result<Runs> {
+fn parse_docx(file_name: &str, search_re: &Regex) -> anyhow::Result<Runs> {
     let data: Value = serde_json::from_str(&read_docx(&read_to_vec(file_name)?)?.json())?;
     let matched_runs = xtract_text_from_doctree(&data, search_re);
     Ok(matched_runs)
@@ -119,7 +117,7 @@ fn xtract_text_from_doctree(root: &Value, search_re: &Regex) -> Runs {
 /// # Errors
 ///
 /// Will return an error if the file cannot be opened or read to the end.
-fn read_to_vec(path: &Path) -> anyhow::Result<Vec<u8>> {
+fn read_to_vec(path: &str) -> anyhow::Result<Vec<u8>> {
     let mut buf = Vec::new();
     std::fs::File::open(path)?.read_to_end(&mut buf)?;
     Ok(buf)
@@ -130,20 +128,20 @@ fn read_to_vec(path: &Path) -> anyhow::Result<Vec<u8>> {
 ///
 /// # Arguments
 ///
-/// * `files` - A vector of file paths to be processed.
+/// * `files` - A vector of file names to be processed.
 /// * `search_re` - A reference to the regular expression used to find matching text within the DOCX files.
 ///
 /// # Returns
 ///
 /// * `Vec<SearchResult>` - A vector of `SearchResult`s containing the file name and the result of
 ///   parsing the file, if successful, or an error if the parsing or reading process fails.
-fn process_files(files: Vec<PathBuf>, search_re: &Regex) -> Vec<SearchResult> {
-    let results = files
+fn process_files(fnames: Vec<String>, search_re: &Regex) -> Vec<SearchResult> {
+    let results = fnames
         .par_iter()
         .map(|file| {
-            let result = parse_docx(file.as_path(), search_re);
+            let result = parse_docx(file, search_re);
             let search_result = SearchResult {
-                file_name: file.display().to_string(),
+                file_name: file.to_string(),
                 maybe_result: result,
             };
             search_result
@@ -196,21 +194,21 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     println!("regex: {:#?}\n\n", args.regex);
     let re = Regex::new(&args.regex).unwrap();
-    let mut files = Vec::new();
-    let fnames = glob("**/*.docx")?;
-    for fname in fnames {
-        match fname {
-            Ok(path) => {
-                files.push(path);
-            }
-            Err(e) => eprintln!("{:?}", e),
-        }
-    }
-    let nfiles = files.len();
-    let search_results = process_files(files, &re);
+    let fpaths = glob("**/*.docx")?;
+    let fnames: Vec<String> = fpaths
+        .into_iter()
+        .filter(|f| f.is_ok())
+        .map(|f| f.unwrap())
+        .map(|p| format!("{}", p.display()))
+        .collect();
+    let search_results = process_files(fnames, &re);
 
-    for result in search_results {
-        println!("=== Searched--> {}\n", result.file_name.bright_red());
+    for (seq_no, result) in search_results.into_iter().enumerate() {
+        println!(
+            "File {}. === Searched--> {}\n",
+            seq_no + 1,
+            result.file_name.bright_red()
+        );
         match result.maybe_result {
             Ok(runs) => {
                 for (run_index, run) in runs.iter().enumerate() {
@@ -224,8 +222,6 @@ fn main() -> anyhow::Result<()> {
             Err(e) => eprintln!("{:?}", e),
         }
     }
-    println!("\nBye! Searched {} files", nfiles);
-
     Ok(())
 }
 

@@ -2,4 +2,5 @@
 .pre-commit-config.yaml
 
 .DS_Store
-flamegraph.svg
+.svg
+1.flamegraph.svg
