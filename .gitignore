@@ -1,6 +1,5 @@
 /target
 .pre-commit-config.yaml
 
-.DS_Store
-.svg
-1.flamegraph.svg
+*.DS_Store
+*.svg
