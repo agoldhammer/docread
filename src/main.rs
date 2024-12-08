@@ -136,19 +136,17 @@ fn read_to_vec(path: &str) -> anyhow::Result<Vec<u8>> {
 ///
 /// * `Vec<SearchResult>` - A vector of `SearchResult`s containing the file name and the result of
 ///   parsing the file, if successful, or an error if the parsing or reading process fails.
-fn process_files(fnames: Vec<Arc<String>>, search_re: &Regex) -> Vec<SearchResult> {
-    let results = fnames
+fn process_files(fnames: Vec<Arc<String>>, search_re: &Regex) {
+    fnames
         .par_iter()
         .map(|file| {
             let result = parse_docx(file, search_re);
-            let search_result = SearchResult {
+            SearchResult {
                 file_name: file.to_string(),
                 maybe_result: result,
-            };
-            search_result
+            }
         })
-        .collect();
-    results
+        .for_each(|search_result| print_result(&search_result, search_re));
 }
 
 /// Segment the given string `s` into a vector of `MatchTriple`s based on the matches of the
@@ -185,11 +183,23 @@ fn segment_on_regex(s: &str, re: &Regex) -> Vec<MatchTriple> {
     triples
 }
 
+/// Prints the results of searching a file for a regular expression.
+///
+/// # Arguments
+///
+/// * `result` - A reference to a `SearchResult` containing the file name and the result of the parsing operation.
+/// * `re` - A reference to the regular expression used for matching text within the file.
+///
+/// If the parsing operation is successful, the function iterates over each text run and segments it into `MatchTriple`s
+/// using the provided regular expression. Each match is printed with a formatted prompt.
+///
+/// If the parsing operation fails, the error is printed to standard error.
 fn print_result(result: &SearchResult, re: &Regex) {
+    println!("Searched file--> {}\n", result.file_name.bright_red());
     match &result.maybe_result {
         Ok(runs) => {
             for (run_index, run) in runs.iter().enumerate() {
-                let mtriples = segment_on_regex(run, &re);
+                let mtriples = segment_on_regex(run, re);
                 for (match_index, mtriple) in mtriples.iter().enumerate() {
                     let prompt = format!("{}-{}", run_index + 1, match_index + 1);
                     println!("  {}-> {}\n", prompt.bright_yellow().on_blue(), mtriple);
@@ -213,21 +223,15 @@ fn main() -> anyhow::Result<()> {
     let fpaths = glob("**/*.docx")?;
     let fnames: Vec<Arc<String>> = fpaths
         .into_iter()
-        .filter(|f| f.is_ok())
-        .map(|f| f.unwrap())
+        .flatten()
         .map(|p| format!("{}", p.display()))
-        .map(|s| Arc::new(s))
+        .map(Arc::new)
         .collect();
-    let search_results = process_files(fnames, &re);
+    let nfiles = fnames.len();
+    process_files(fnames, &re);
 
-    for (seq_no, result) in search_results.into_iter().enumerate() {
-        println!(
-            "File {}. === Searched--> {}\n",
-            seq_no + 1,
-            result.file_name.bright_red()
-        );
-        print_result(&result, &re);
-    }
+    println!("\n{} files processed\nBye!", nfiles);
+
     Ok(())
 }
 
