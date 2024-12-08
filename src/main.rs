@@ -185,6 +185,21 @@ fn segment_on_regex(s: &str, re: &Regex) -> Vec<MatchTriple> {
     triples
 }
 
+fn print_result(result: &SearchResult, re: &Regex) {
+    match &result.maybe_result {
+        Ok(runs) => {
+            for (run_index, run) in runs.iter().enumerate() {
+                let mtriples = segment_on_regex(run, &re);
+                for (match_index, mtriple) in mtriples.iter().enumerate() {
+                    let prompt = format!("{}-{}", run_index + 1, match_index + 1);
+                    println!("  {}-> {}\n", prompt.bright_yellow().on_blue(), mtriple);
+                }
+            }
+        }
+        Err(e) => eprintln!("{:?}", e),
+    }
+}
+
 /// Search for the given regular expression in all .docx files in the current directory,
 /// and all subdirectories.
 ///
@@ -211,18 +226,7 @@ fn main() -> anyhow::Result<()> {
             seq_no + 1,
             result.file_name.bright_red()
         );
-        match result.maybe_result {
-            Ok(runs) => {
-                for (run_index, run) in runs.iter().enumerate() {
-                    let mtriples = segment_on_regex(run, &re);
-                    for (match_index, mtriple) in mtriples.iter().enumerate() {
-                        let prompt = format!("{}-{}", run_index + 1, match_index + 1);
-                        println!("  {}-> {}\n", prompt.bright_yellow().on_blue(), mtriple);
-                    }
-                }
-            }
-            Err(e) => eprintln!("{:?}", e),
-        }
+        print_result(&result, &re);
     }
     Ok(())
 }
