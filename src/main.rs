@@ -59,6 +59,8 @@ impl Display for MatchTriple {
 struct Args {
     #[arg(short, long)]
     regex: String,
+    #[arg(short, long, default_value = "**/*.docx")]
+    glob: String,
 }
 
 /// Parses a DOCX file specified by `file_name` and extracts text that matches the given regular
@@ -218,9 +220,9 @@ fn print_result(result: &SearchResult, re: &Regex) {
 ///
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
-    println!("regex: {:#?}\n\n", args.regex);
     let re = Regex::new(&args.regex).unwrap();
-    let fpaths = glob("**/*.docx")?;
+    let fpaths = glob(&args.glob)?;
+    println!("regex: {:#?}, glob={:#?}\n\n", &args.regex, &args.glob);
     let fnames: Vec<Arc<String>> = fpaths
         .into_iter()
         .flatten()
