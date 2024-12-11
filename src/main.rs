@@ -2,13 +2,14 @@ use clap::Parser;
 use colored::Colorize;
 use docx_rs::*;
 use glob::glob;
+use rayon::iter::ParallelBridge;
 use rayon::prelude::*;
 use regex::Regex;
 use serde_json::Value;
 use std::collections::VecDeque;
 use std::fmt::{self, Display, Formatter};
 use std::io::Read;
-use std::sync::Arc;
+// use std::sync::Arc;
 
 type Run = String;
 type Runs = Vec<Run>;
@@ -138,17 +139,24 @@ fn read_to_vec(path: &str) -> anyhow::Result<Vec<u8>> {
 ///
 /// * `Vec<SearchResult>` - A vector of `SearchResult`s containing the file name and the result of
 ///   parsing the file, if successful, or an error if the parsing or reading process fails.
-fn process_files(fnames: Vec<Arc<String>>, search_re: &Regex) {
-    fnames
-        .par_iter()
+fn process_files(pattern: &str, search_re: &Regex) -> anyhow::Result<()> {
+    println!("regex: {:#?}, glob={:#?}\n\n", search_re, pattern);
+    // obtain paths from specified glob pattern
+    let fpaths = glob(pattern)?;
+    // and then process each path in parallel
+    fpaths
+        .par_bridge()
+        .flatten()
+        .map(|p| format!("{}", p.display()))
         .map(|file| {
-            let result = parse_docx(file, search_re);
+            let result = parse_docx(file.as_str(), search_re);
             SearchResult {
                 file_name: file.to_string(),
                 maybe_result: result,
             }
         })
         .for_each(|search_result| print_result(&search_result, search_re));
+    Ok(())
 }
 
 /// Segment the given string `s` into a vector of `MatchTriple`s based on the matches of the
@@ -221,18 +229,11 @@ fn print_result(result: &SearchResult, re: &Regex) {
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let re = Regex::new(&args.regex).unwrap();
-    let fpaths = glob(&args.glob)?;
-    println!("regex: {:#?}, glob={:#?}\n\n", &args.regex, &args.glob);
-    let fnames: Vec<Arc<String>> = fpaths
-        .into_iter()
-        .flatten()
-        .map(|p| format!("{}", p.display()))
-        .map(Arc::new)
-        .collect();
-    let nfiles = fnames.len();
-    process_files(fnames, &re);
 
-    println!("\n{} files processed\nBye!", nfiles);
+    // let nfiles = fnames.len();
+    process_files(&args.glob, &re)?;
+
+    // println!("\n{} files processed\nBye!", nfiles);
 
     Ok(())
 }
