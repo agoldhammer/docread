@@ -233,10 +233,12 @@ fn print_result(result: &SearchResult, re: &Regex, quiet: &bool) {
         Ok(runs) => {
             if *quiet {
                 if !runs.is_empty() {
-                    let found = "Matched {runs.len()} runs\n".to_string().bright_green();
-                    println!("{found}\n");
+                    let runs_len = format!("Matched {} runs", runs.len())
+                        .bright_green()
+                        .on_black();
+                    println!("{runs_len}\n");
                 } else {
-                    let not_found = "No matches found".to_string().bright_red();
+                    let not_found = "No matches found".to_string().bright_red().on_black();
                     println!("{not_found}\n");
                 }
             } else {
