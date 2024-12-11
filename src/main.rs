@@ -144,8 +144,10 @@ fn process_files(pattern: &str, search_re: &Regex) -> anyhow::Result<()> {
     // obtain paths from specified glob pattern
     let fpaths = glob(pattern)?;
     // and then process each path in parallel
+    // TODO : need to add a progress bar, file counter, and understand long termination time
     fpaths
         .par_bridge()
+        // next line idiomatically tests for valid path and unwraps in one line
         .flatten()
         .map(|p| format!("{}", p.display()))
         .map(|file| {
@@ -229,12 +231,10 @@ fn print_result(result: &SearchResult, re: &Regex) {
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let re = Regex::new(&args.regex).unwrap();
-
-    // let nfiles = fnames.len();
     process_files(&args.glob, &re)?;
-
-    // println!("\n{} files processed\nBye!", nfiles);
-
+    // TODO: this is a kludge
+    let nfiles = glob(&args.glob).unwrap().count();
+    println!("Searched {nfiles} files\n");
     Ok(())
 }
 
