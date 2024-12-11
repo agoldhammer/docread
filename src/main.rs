@@ -2,7 +2,7 @@ use clap::Parser;
 use colored::Colorize;
 use docx_rs::*;
 use glob::glob;
-use rayon::iter::ParallelBridge;
+// use rayon::iter::ParallelBridge;
 use rayon::prelude::*;
 use regex::Regex;
 use serde_json::Value;
@@ -58,10 +58,21 @@ impl Display for MatchTriple {
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    #[arg(short, long)]
+    #[arg(
+        short,
+        long,
+        help = "Regular expression to search for, e.g. 'Hi|[Hh]ello'"
+    )]
     regex: String,
-    #[arg(short, long, default_value = "**/*.docx")]
+    #[arg(
+        short,
+        long,
+        default_value = "**/*.docx",
+        help = "Must enclose in parens"
+    )]
     glob: String,
+    #[arg(short, long, help = "show file names & match status only")]
+    quiet: bool,
 }
 
 /// Parses a DOCX file specified by `file_name` and extracts text that matches the given regular
@@ -127,29 +138,30 @@ fn read_to_vec(path: &str) -> anyhow::Result<Vec<u8>> {
     Ok(buf)
 }
 
-/// Process each file in the given `files` vector by attempting to parse it using the given
-/// regular expression `search_re`. The results are collected into a vector of `SearchResult`s.
+/// Processes files matching the given glob pattern, searching for text that matches the
+/// specified regular expression, and printing the results.
 ///
 /// # Arguments
 ///
-/// * `files` - A vector of file names to be processed.
-/// * `search_re` - A reference to the regular expression used to find matching text within the DOCX files.
+/// * `pattern` - A glob pattern to match files. Should end with `.docx`.
+/// * `search_re` - A regular expression used to search for matching text within each file.
+/// * `quiet` - A boolean flag to control whether minimal output is shown.
 ///
 /// # Returns
 ///
-/// * `Vec<SearchResult>` - A vector of `SearchResult`s containing the file name and the result of
-///   parsing the file, if successful, or an error if the parsing or reading process fails.
-fn process_files(pattern: &str, search_re: &Regex) -> anyhow::Result<()> {
-    println!("regex: {:#?}, glob={:#?}\n\n", search_re, pattern);
+/// * `anyhow::Result<()>` - Returns an Ok result if processing is successful; otherwise, returns an error.
+fn process_files(pattern: &str, search_re: &Regex, quiet: &bool) -> anyhow::Result<()> {
     // obtain paths from specified glob pattern
     let fpaths = glob(pattern)?;
-    // and then process each path in parallel
-    // TODO : need to add a progress bar, file counter, and understand long termination time
-    fpaths
-        .par_bridge()
-        // next line idiomatically tests for valid path and unwraps in one line
+    // and then store all fnames in a vector (needed for count)
+    // can use par_bridge here, but this compromise seems better
+    let fnames: Vec<String> = fpaths
         .flatten()
         .map(|p| format!("{}", p.display()))
+        .collect();
+    let nfiles = fnames.len(); // save to print at end of procedure
+    fnames
+        .par_iter()
         .map(|file| {
             let result = parse_docx(file.as_str(), search_re);
             SearchResult {
@@ -157,7 +169,12 @@ fn process_files(pattern: &str, search_re: &Regex) -> anyhow::Result<()> {
                 maybe_result: result,
             }
         })
-        .for_each(|search_result| print_result(&search_result, search_re));
+        .for_each(|search_result| print_result(&search_result, search_re, quiet));
+    println!("Searched {nfiles} files\n");
+    println!(
+        "  Search parameters: regex: {}, glob={:#?}\n\n",
+        search_re, pattern
+    );
     Ok(())
 }
 
@@ -195,30 +212,45 @@ fn segment_on_regex(s: &str, re: &Regex) -> Vec<MatchTriple> {
     triples
 }
 
-/// Prints the results of searching a file for a regular expression.
+/// Prints the search results for a DOCX file, highlighting matches of a regular expression.
 ///
 /// # Arguments
 ///
-/// * `result` - A reference to a `SearchResult` containing the file name and the result of the parsing operation.
-/// * `re` - A reference to the regular expression used for matching text within the file.
+/// * `result` - A reference to a `SearchResult` struct containing the file name and potential matches.
+/// * `re` - A reference to the regular expression used for identifying matches in the text runs.
+/// * `quiet` - A boolean indicating whether to suppress detailed output. If true, only the count of
+///   matched runs is printed. Otherwise, details of each match within each run are printed.
 ///
-/// If the parsing operation is successful, the function iterates over each text run and segments it into `MatchTriple`s
-/// using the provided regular expression. Each match is printed with a formatted prompt.
+/// # Behavior
 ///
-/// If the parsing operation fails, the error is printed to standard error.
-fn print_result(result: &SearchResult, re: &Regex) {
+/// If a `SearchResult` contains matches (`Ok` variant), the function prints the number of matched runs
+/// when `quiet` is true. Otherwise, it iterates through each match and prints details in a formatted
+/// manner, using `segment_on_regex` to divide the text into segments. If there's an error (`Err` variant),
+/// the error is printed to standard error.
+fn print_result(result: &SearchResult, re: &Regex, quiet: &bool) {
     println!("Searched file--> {}\n", result.file_name.bright_red());
     match &result.maybe_result {
         Ok(runs) => {
-            for (run_index, run) in runs.iter().enumerate() {
-                let mtriples = segment_on_regex(run, re);
-                for (match_index, mtriple) in mtriples.iter().enumerate() {
-                    let prompt = format!("{}-{}", run_index + 1, match_index + 1);
-                    println!("  {}-> {}\n", prompt.bright_yellow().on_blue(), mtriple);
+            if *quiet {
+                if !runs.is_empty() {
+                    let found = "Matched {runs.len()} runs\n".to_string().bright_green();
+                    println!("{found}\n");
+                } else {
+                    let not_found = "No matches found".to_string().bright_red();
+                    println!("{not_found}\n");
+                }
+            } else {
+                for (run_index, run) in runs.iter().enumerate() {
+                    let mtriples = segment_on_regex(run, re);
+                    for (match_index, mtriple) in mtriples.iter().enumerate() {
+                        let prompt = format!("{}-{}", run_index + 1, match_index + 1);
+                        println!("  {}-> {}\n", prompt.bright_yellow().on_blue(), mtriple);
+                    }
                 }
             }
+            println!("===\n");
         }
-        Err(e) => eprintln!("{:?}", e),
+        Err(e) => eprintln!("{:?}\n", e),
     }
 }
 
@@ -231,10 +263,12 @@ fn print_result(result: &SearchResult, re: &Regex) {
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let re = Regex::new(&args.regex).unwrap();
-    process_files(&args.glob, &re)?;
-    // TODO: this is a kludge
-    let nfiles = glob(&args.glob).unwrap().count();
-    println!("Searched {nfiles} files\n");
+    let valid_glob = &args.glob.ends_with(".docx");
+    if *valid_glob {
+        process_files(&args.glob, &re, &args.quiet)?;
+    } else {
+        eprintln!("Glob pattern {} does not end with .docx", args.glob);
+    }
     Ok(())
 }
 
