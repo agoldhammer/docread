@@ -28,7 +28,7 @@ fn read_to_vec(path: &str) -> anyhow::Result<Vec<u8>> {
 }
 
 pub trait ReadIntoBuf {
-    fn read_into_buf(&mut self) -> anyhow::Result<Vec<u8>>;
+    fn read_into_buf(&self) -> anyhow::Result<Vec<u8>>;
 }
 
 #[derive(Debug)]
@@ -45,7 +45,7 @@ impl From<&str> for RegularFile {
 }
 
 impl ReadIntoBuf for &RegularFile {
-    fn read_into_buf(&mut self) -> anyhow::Result<Vec<u8>> {
+    fn read_into_buf(&self) -> anyhow::Result<Vec<u8>> {
         read_to_vec(&self.fname)
     }
 }
@@ -113,15 +113,14 @@ struct Args {
 ///
 /// # Arguments
 ///
-/// * `file_name` - A reference to the name of the DOCX file to be parsed.
+/// * `file_like` - A reference to the name of a file_like object (docx or zip subarchive) to be parsed.
 /// * `search_re` - A reference to the regular expression used to find matching text within the DOCX file.
 ///
 /// # Returns
 ///
 /// * `anyhow::Result<Runs>` - A result containing a vector of text runs that match the regular expression,
 ///   or an error if the parsing or reading process fails.
-fn parse_docx(mut file_like: impl ReadIntoBuf, search_re: &Regex) -> anyhow::Result<Runs> {
-    // let mut rf = RegularFile::from(file_name);
+fn parse_docx(file_like: impl ReadIntoBuf, search_re: &Regex) -> anyhow::Result<Runs> {
     let buffer = file_like.read_into_buf()?;
     let data: Value = serde_json::from_str(&read_docx(&buffer)?.json())?;
     let matched_runs = xtract_text_from_doctree(&data, search_re);
