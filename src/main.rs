@@ -16,6 +16,17 @@ struct SearchResult {
     maybe_result: anyhow::Result<Runs>,
 }
 
+/// Reads the contents of a file at the given `path` into a vector of bytes.
+///
+/// # Errors
+///
+/// Will return an error if the file cannot be opened or read to the end.
+fn read_to_vec(path: &str) -> anyhow::Result<Vec<u8>> {
+    let mut buf = Vec::new();
+    std::fs::File::open(path)?.read_to_end(&mut buf)?;
+    Ok(buf)
+}
+
 pub trait ReadIntoBuf {
     fn read_into_buf(&mut self) -> anyhow::Result<Vec<u8>>;
 }
@@ -33,7 +44,7 @@ impl From<&str> for RegularFile {
     }
 }
 
-impl ReadIntoBuf for RegularFile {
+impl ReadIntoBuf for &RegularFile {
     fn read_into_buf(&mut self) -> anyhow::Result<Vec<u8>> {
         read_to_vec(&self.fname)
     }
@@ -109,9 +120,9 @@ struct Args {
 ///
 /// * `anyhow::Result<Runs>` - A result containing a vector of text runs that match the regular expression,
 ///   or an error if the parsing or reading process fails.
-fn parse_docx(file_name: &str, search_re: &Regex) -> anyhow::Result<Runs> {
-    let mut rf = RegularFile::from(file_name);
-    let buffer = rf.read_into_buf()?;
+fn parse_docx(mut file_like: impl ReadIntoBuf, search_re: &Regex) -> anyhow::Result<Runs> {
+    // let mut rf = RegularFile::from(file_name);
+    let buffer = file_like.read_into_buf()?;
     let data: Value = serde_json::from_str(&read_docx(&buffer)?.json())?;
     let matched_runs = xtract_text_from_doctree(&data, search_re);
     Ok(matched_runs)
@@ -151,17 +162,6 @@ fn xtract_text_from_doctree(root: &Value, search_re: &Regex) -> Runs {
     matching_runs
 }
 
-/// Reads the contents of a file at the given `path` into a vector of bytes.
-///
-/// # Errors
-///
-/// Will return an error if the file cannot be opened or read to the end.
-fn read_to_vec(path: &str) -> anyhow::Result<Vec<u8>> {
-    let mut buf = Vec::new();
-    std::fs::File::open(path)?.read_to_end(&mut buf)?;
-    Ok(buf)
-}
-
 /// Processes files matching the given glob pattern, searching for text that matches the
 /// specified regular expression, and printing the results.
 ///
@@ -183,13 +183,17 @@ fn process_files(pattern: &str, search_re: &Regex, quiet: &bool) -> anyhow::Resu
         .flatten()
         .map(|p| format!("{}", p.display()))
         .collect();
-    let nfiles = fnames.len(); // save to print at end of procedure
-    fnames
+    let nfiles = fnames.len();
+    let file_likes: Vec<RegularFile> = fnames
+        .into_iter()
+        .map(|f| RegularFile { fname: f })
+        .collect(); // save to print at end of procedure
+    file_likes
         .par_iter()
-        .map(|file| {
-            let result = parse_docx(file.as_str(), search_re);
+        .map(|file_like| {
+            let result = parse_docx(file_like, search_re);
             SearchResult {
-                file_name: file.to_string(),
+                file_name: file_like.fname.clone(),
                 maybe_result: result,
             }
         })
