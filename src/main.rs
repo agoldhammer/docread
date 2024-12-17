@@ -2,14 +2,12 @@ use clap::Parser;
 use colored::Colorize;
 use docx_rs::*;
 use glob::glob;
-// use rayon::iter::ParallelBridge;
 use rayon::prelude::*;
 use regex::Regex;
 use serde_json::Value;
 use std::collections::VecDeque;
 use std::fmt::{self, Display, Formatter};
 use std::io::Read;
-// use std::sync::Arc;
 
 type Run = String;
 type Runs = Vec<Run>;
@@ -17,6 +15,30 @@ struct SearchResult {
     file_name: String,
     maybe_result: anyhow::Result<Runs>,
 }
+
+pub trait ReadIntoBuf {
+    fn read_into_buf(&mut self) -> anyhow::Result<Vec<u8>>;
+}
+
+#[derive(Debug)]
+struct RegularFile {
+    fname: String,
+}
+
+impl From<&str> for RegularFile {
+    fn from(s: &str) -> Self {
+        RegularFile {
+            fname: s.to_string(),
+        }
+    }
+}
+
+impl ReadIntoBuf for RegularFile {
+    fn read_into_buf(&mut self) -> anyhow::Result<Vec<u8>> {
+        read_to_vec(&self.fname)
+    }
+}
+
 #[derive(Debug)]
 #[allow(dead_code)]
 struct MatchTriple(
@@ -88,7 +110,9 @@ struct Args {
 /// * `anyhow::Result<Runs>` - A result containing a vector of text runs that match the regular expression,
 ///   or an error if the parsing or reading process fails.
 fn parse_docx(file_name: &str, search_re: &Regex) -> anyhow::Result<Runs> {
-    let data: Value = serde_json::from_str(&read_docx(&read_to_vec(file_name)?)?.json())?;
+    let mut rf = RegularFile::from(file_name);
+    let buffer = rf.read_into_buf()?;
+    let data: Value = serde_json::from_str(&read_docx(&buffer)?.json())?;
     let matched_runs = xtract_text_from_doctree(&data, search_re);
     Ok(matched_runs)
 }
