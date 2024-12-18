@@ -184,6 +184,13 @@ fn xtract_text_from_doctree(root: &Value, search_re: &Regex) -> Runs {
 fn process_files(pattern: &str, search_re: &Regex, quiet: &bool) -> anyhow::Result<()> {
     // obtain paths from specified glob pattern
     let fpaths = glob(pattern)?;
+    let zip_pattern = pattern.replace(".docx", ".zip");
+    let zip_fpaths = glob(&zip_pattern)?;
+    let zip_names: Vec<String> = zip_fpaths
+        .flatten()
+        .map(|p| format!("{}", p.display()))
+        .collect(); // TODO: make this trait object Vec<Box <dyn ReadIntoBuf>>
+    println!("Found {:?} zip archives\n", zip_names);
     // and then store all fnames in a vector (needed for count)
     // can use par_bridge here, but this compromise seems better
     let fnames: Vec<String> = fpaths
@@ -304,8 +311,8 @@ fn print_result(result: &SearchResult, re: &Regex, quiet: &bool) {
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let re = Regex::new(&args.regex).unwrap();
-    let valid_glob = &args.glob.ends_with(".docx");
-    if *valid_glob {
+    let valid_glob = args.glob.ends_with(".docx");
+    if valid_glob {
         process_files(&args.glob, &re, &args.quiet)?;
     } else {
         eprintln!("Glob pattern {} does not end with .docx", args.glob);
@@ -352,4 +359,75 @@ mod tests {
         assert_eq!(mtriples[4].1, "th");
         assert_eq!(mtriples[4].2, "ing");
     }
+
+    // added/modified from Claude
+
+    //     use std::io::{Error, ErrorKind};
+    //     struct MockFileReader {
+    //         content: Vec<u8>,
+    //         should_fail: bool,
+    //     }
+
+    //     impl MockFileReader {
+    //         fn new(content: Vec<u8>, should_fail: bool) -> Self {
+    //             Self {
+    //                 content,
+    //                 should_fail,
+    //             }
+    //         }
+    //     }
+
+    //     impl ReadIntoBuf for MockFileReader {
+    //         fn read_into_buf(&self) -> anyhow::Result<Vec<u8>> {
+    //             if self.should_fail {
+    //                 Err(Error::new(ErrorKind::Other, "Mock read error").into())
+    //             } else {
+    //                 Ok(self.content.clone())
+    //             }
+    //         }
+
+    //         fn get_fname(&self) -> &str {
+    //             "mock.docx"
+    //         }
+    //     }
+
+    //     // Helper function to create a mock DOCX JSON content
+    //     fn create_mock_docx_json(text: &str) -> String {
+    //         format!(
+    //             r#"{{
+    //             "document": {{
+    //                 "body": {{
+    //                     "paragraphs": [
+    //                         {{
+    //                             "runs": [
+    //                                 {{
+    //                                     "text": "{}"
+    //                                 }}
+    //                             ]
+    //                         }}
+    //                     ]
+    //                 }}
+    //             }}
+    //         }}"#,
+    //             text
+    //         )
+    //     }
+
+    //     #[test]
+    //     fn test_successful_parse_with_matches() -> anyhow::Result<()> {
+    //         // Arrange
+    //         let mock_content = create_mock_docx_json("Hello world! This is a test document.");
+    //         let file_reader = Box::new(MockFileReader::new(mock_content.as_bytes().to_vec(), false));
+    //         let dyn_reader: Box<dyn ReadIntoBuf + Send + Sync> = file_reader;
+    //         let search_re = Regex::new(r"test")?;
+
+    //         // Act
+    //         let result = parse_docx(&dyn_reader, &search_re)?;
+
+    //         // Assert
+    //         assert!(!result.is_empty());
+    //         assert_eq!(result[1], "test");
+    //         Ok(())
+    //     }
+    // }
 }
