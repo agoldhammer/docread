@@ -29,6 +29,7 @@ fn read_to_vec(path: &str) -> anyhow::Result<Vec<u8>> {
 
 pub trait ReadIntoBuf {
     fn read_into_buf(&self) -> anyhow::Result<Vec<u8>>;
+    fn get_fname(&self) -> &str;
 }
 
 #[derive(Debug)]
@@ -44,9 +45,13 @@ impl From<&str> for RegularFile {
     }
 }
 
-impl ReadIntoBuf for &RegularFile {
+impl ReadIntoBuf for RegularFile {
     fn read_into_buf(&self) -> anyhow::Result<Vec<u8>> {
         read_to_vec(&self.fname)
+    }
+
+    fn get_fname(&self) -> &str {
+        self.fname.as_str()
     }
 }
 
@@ -120,7 +125,10 @@ struct Args {
 ///
 /// * `anyhow::Result<Runs>` - A result containing a vector of text runs that match the regular expression,
 ///   or an error if the parsing or reading process fails.
-fn parse_docx(file_like: impl ReadIntoBuf, search_re: &Regex) -> anyhow::Result<Runs> {
+fn parse_docx(
+    file_like: &Box<dyn ReadIntoBuf + Send + Sync>,
+    search_re: &Regex,
+) -> anyhow::Result<Runs> {
     let buffer = file_like.read_into_buf()?;
     let data: Value = serde_json::from_str(&read_docx(&buffer)?.json())?;
     let matched_runs = xtract_text_from_doctree(&data, search_re);
@@ -183,16 +191,25 @@ fn process_files(pattern: &str, search_re: &Regex, quiet: &bool) -> anyhow::Resu
         .map(|p| format!("{}", p.display()))
         .collect();
     let nfiles = fnames.len();
-    let file_likes: Vec<RegularFile> = fnames
-        .into_iter()
-        .map(|f| RegularFile { fname: f })
-        .collect(); // save to print at end of procedure
-    file_likes
+    // TODO: make this trait object Vec<Box <dyn ReadIntoBuf>>
+    let mut file_surrogates: Vec<Box<dyn ReadIntoBuf + Send + Sync>> = Vec::new();
+    for fname in &fnames {
+        file_surrogates.push(Box::new(RegularFile {
+            fname: fname.clone(),
+        }));
+    }
+    // let file_likes: Vec<Box<RegularFile>> = fnames
+    //     .into_iter()
+    //     .map(|f| Box::new(RegularFile { fname: f }))
+    //     .collect(); // save to print at end of procedure
+    //                 // let mut file_surrogates: Vec<Box<dyn ReadIntoBuf>> = Vec::new();
+
+    file_surrogates
         .par_iter()
         .map(|file_like| {
             let result = parse_docx(file_like, search_re);
             SearchResult {
-                file_name: file_like.fname.clone(),
+                file_name: file_like.get_fname().to_string(),
                 maybe_result: result,
             }
         })
