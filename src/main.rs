@@ -198,11 +198,6 @@ fn process_files(pattern: &str, search_re: &Regex, quiet: &bool) -> anyhow::Resu
             fname: fname.clone(),
         }));
     }
-    // let file_likes: Vec<Box<RegularFile>> = fnames
-    //     .into_iter()
-    //     .map(|f| Box::new(RegularFile { fname: f }))
-    //     .collect(); // save to print at end of procedure
-    //                 // let mut file_surrogates: Vec<Box<dyn ReadIntoBuf>> = Vec::new();
 
     file_surrogates
         .par_iter()
