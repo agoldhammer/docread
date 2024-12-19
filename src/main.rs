@@ -3,6 +3,7 @@ use regex::Regex;
 
 mod matcher;
 mod reader;
+mod ziphandler;
 use reader::process_files;
 
 #[derive(Parser, Debug)]
