@@ -67,6 +67,7 @@ impl ReadIntoBuf for RegularFile {
 ///
 /// * `anyhow::Result<Runs>` - A result containing a vector of text runs that match the regular expression,
 ///   or an error if the parsing or reading process fails.
+#[allow(clippy::borrowed_box)]
 fn parse_docx(
     file_like: &Box<dyn ReadIntoBuf + Send + Sync>,
     search_re: &Regex,
