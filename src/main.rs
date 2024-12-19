@@ -18,7 +18,7 @@ struct Args {
         short,
         long,
         default_value = "**/*.docx",
-        help = "Must enclose in parens"
+        help = "Must enclose in quotes"
     )]
     glob: String,
     #[arg(short, long, help = "show file names & match status only")]
