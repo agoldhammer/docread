@@ -1,10 +1,6 @@
 use std::fs::File;
-use std::io::Write;
-use std::io::{self, Read};
-use tempfile::tempdir;
-use zip::write::SimpleFileOptions;
+
 use zip::ZipArchive;
-use zip::ZipWriter;
 
 struct ZipEntry {
     archive_name: String,
@@ -32,9 +28,21 @@ fn list_docx_files_in_zip(zip_path: &str) -> anyhow::Result<Vec<ZipEntry>> {
     Ok(docx_files)
 }
 #[cfg(test)]
+
 mod tests {
     use super::*;
+    use std::io::Write;
+    // use std::io::{self, Read};
 
+    use tempfile::tempdir;
+    use zip::write::SimpleFileOptions;
+    use zip::ZipWriter;
+
+    /// Test that `list_docx_files_in_zip` returns a list of zip entries whose names end with ".docx".
+    ///
+    /// This test creates a temporary zip file containing three files: "test1.docx", "test2.txt", and
+    /// "test3.docx". It then calls `list_docx_files_in_zip` to get a list of zip entries, and checks
+    /// that the returned list contains only the two docx files.
     #[test]
     fn test_list_docx_files_in_zip() -> anyhow::Result<()> {
         let dir = tempdir()?;
