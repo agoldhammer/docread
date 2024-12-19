@@ -77,6 +77,27 @@ fn parse_docx(
     Ok(matched_runs)
 }
 
+#[derive(Debug)]
+struct Fnames {
+    fnames: Vec<String>,
+}
+
+impl TryFrom<&str> for Fnames {
+    type Error = anyhow::Error;
+    /// Attempts to create a `Fnames` from a glob pattern. The `glob` crate is used to find all
+    /// matching files, and the resulting paths are converted to `String`s and stored in the
+    /// `fnames` member of the `Fnames` struct.
+    ///
+    fn try_from(pattern: &str) -> anyhow::Result<Self> {
+        let fpaths = glob(pattern)?;
+        let fnames: Vec<String> = fpaths
+            .flatten()
+            .map(|p| format!("{}", p.display()))
+            .collect();
+        Ok(Fnames { fnames })
+    }
+}
+
 /// Processes files matching the given glob pattern, searching for text that matches the
 /// specified regular expression, and printing the results.
 ///
@@ -90,25 +111,15 @@ fn parse_docx(
 ///
 /// * `anyhow::Result<()>` - Returns an Ok result if processing is successful; otherwise, returns an error.
 pub(crate) fn process_files(pattern: &str, search_re: &Regex, quiet: &bool) -> anyhow::Result<()> {
-    // obtain paths from specified glob pattern
-    let fpaths = glob(pattern)?;
-    let zip_pattern = pattern.replace(".docx", ".zip");
-    let zip_fpaths = glob(&zip_pattern)?;
-    let zip_names: Vec<String> = zip_fpaths
-        .flatten()
-        .map(|p| format!("{}", p.display()))
-        .collect(); // TODO: make this trait object Vec<Box <dyn ReadIntoBuf>>
-    println!("Found {:?} zip archives\n", zip_names);
-    // and then store all fnames in a vector (needed for count)
+    // TODO: Implement zip archive handling
+    // let zip_pattern = pattern.replace(".docx", ".zip");
+    // let zip_fnames = Fnames::try_from(zip_pattern.as_str())?;
+    // println!("Found {:?} zip archives\n", zip_fnames);
     // can use par_bridge here, but this compromise seems better
-    let fnames: Vec<String> = fpaths
-        .flatten()
-        .map(|p| format!("{}", p.display()))
-        .collect();
-    let nfiles = fnames.len();
-    // TODO: make this trait object Vec<Box <dyn ReadIntoBuf>>
+    let docx_fnames = Fnames::try_from(pattern)?;
+    let nfiles = docx_fnames.fnames.len();
     let mut file_surrogates: Vec<Box<dyn ReadIntoBuf + Send + Sync>> = Vec::new();
-    for fname in &fnames {
+    for fname in &docx_fnames.fnames {
         file_surrogates.push(Box::new(RegularFile {
             fname: fname.clone(),
         }));
@@ -208,4 +219,32 @@ fn xtract_text_from_doctree(root: &Value, search_re: &Regex) -> Runs {
         }
     }
     matching_runs
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_xtract_text_from_doctree() {
+        let data = r#"
+        {
+            "document": {
+                "children": [
+                    {
+                        "type": "text",
+                        "data": {
+                            "text": "Hello, world!"
+                        }
+                    }
+                ]
+            }
+        }
+        "#;
+        let root: Value = serde_json::from_str(data).unwrap();
+        let search_re = Regex::new(r"[Hh]ello").unwrap();
+        let runs = xtract_text_from_doctree(&root, &search_re);
+        assert_eq!(runs.len(), 1);
+        assert_eq!(runs[0], "Hello, world!");
+    }
 }
