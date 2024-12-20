@@ -8,6 +8,7 @@ type Runs = Vec<Run>;
 use colored::Colorize;
 use rayon::prelude::*;
 use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
 
 use crate::matcher;
 use crate::ziphandler::{zip_to_zipentries, ZipEntry};
@@ -130,7 +131,9 @@ impl TryFrom<&str> for Fnames {
 ///
 /// * `anyhow::Result<()>` - Returns an Ok result if processing is successful; otherwise, returns an error.
 pub(crate) fn process_files(pattern: &str, search_re: &Regex, quiet: &bool) -> anyhow::Result<()> {
-    // TODO: Implement zip archive handling
+    // output mutex
+    let output_mutex = Arc::new(Mutex::new(0));
+    // done: Implement zip archive handling
     let zip_pattern = pattern.replace(".docx", ".zip");
     let zip_fnames = Fnames::try_from(zip_pattern.as_str())?;
     println!("Found {:?} zip archives\n", zip_fnames);
@@ -161,7 +164,9 @@ pub(crate) fn process_files(pattern: &str, search_re: &Regex, quiet: &bool) -> a
                 maybe_result: result,
             }
         })
-        .for_each(|search_result| print_result(&search_result, search_re, quiet));
+        .for_each(|search_result| {
+            print_result(&search_result, search_re, quiet, output_mutex.clone())
+        });
     println!("Searched {nfiles} files amd {nzips} zip archives\n");
     println!(
         "  Search parameters: regex: {}, glob={:#?}\n\n",
@@ -185,7 +190,8 @@ pub(crate) fn process_files(pattern: &str, search_re: &Regex, quiet: &bool) -> a
 /// when `quiet` is true. Otherwise, it iterates through each match and prints details in a formatted
 /// manner, using `segment_on_regex` to divide the text into segments. If there's an error (`Err` variant),
 /// the error is printed to standard error.
-fn print_result(result: &SearchResult, re: &Regex, quiet: &bool) {
+fn print_result(result: &SearchResult, re: &Regex, quiet: &bool, output_mutex: Arc<Mutex<u32>>) {
+    let _output_guard = output_mutex.lock().unwrap();
     println!("Searched file--> {}\n", result.file_name.bright_red());
     match &result.maybe_result {
         Ok(runs) => {
