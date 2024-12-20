@@ -10,6 +10,7 @@ use rayon::prelude::*;
 use std::collections::VecDeque;
 
 use crate::matcher;
+use crate::ziphandler::ZipEntry;
 
 struct SearchResult {
     file_name: String,
@@ -52,6 +53,18 @@ impl ReadIntoBuf for RegularFile {
 
     fn get_fname(&self) -> &str {
         self.fname.as_str()
+    }
+}
+
+impl ReadIntoBuf for ZipEntry {
+    fn read_into_buf(&self) -> anyhow::Result<Vec<u8>> {
+        // read_to_vec(&self.entry_name)
+        // TODO: Implement zip archive handling
+        unimplemented!("ZipEntry::read_into_buf not implemented")
+    }
+
+    fn get_fname(&self) -> &str {
+        self.entry_name.as_str()
     }
 }
 

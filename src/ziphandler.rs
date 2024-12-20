@@ -2,9 +2,9 @@ use std::fs::File;
 
 use zip::ZipArchive;
 
-struct ZipEntry {
-    archive_name: String,
-    entry_name: String,
+pub(crate) struct ZipEntry {
+    pub(crate) archive_name: String,
+    pub(crate) entry_name: String,
 }
 
 fn list_docx_files_in_zip(zip_path: &str) -> anyhow::Result<Vec<ZipEntry>> {
