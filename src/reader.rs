@@ -10,7 +10,7 @@ use rayon::prelude::*;
 use std::collections::VecDeque;
 
 use crate::matcher;
-use crate::ziphandler::ZipEntry;
+use crate::ziphandler::{zip_to_zipentries, ZipEntry};
 
 struct SearchResult {
     file_name: String,
@@ -30,7 +30,7 @@ fn read_to_vec(path: &str) -> anyhow::Result<Vec<u8>> {
 
 pub trait ReadIntoBuf {
     fn read_into_buf(&self) -> anyhow::Result<Vec<u8>>;
-    fn get_fname(&self) -> &str;
+    fn get_fname(&self) -> String;
 }
 
 #[derive(Debug)]
@@ -51,8 +51,8 @@ impl ReadIntoBuf for RegularFile {
         read_to_vec(&self.fname)
     }
 
-    fn get_fname(&self) -> &str {
-        self.fname.as_str()
+    fn get_fname(&self) -> String {
+        self.fname.clone()
     }
 }
 
@@ -60,11 +60,16 @@ impl ReadIntoBuf for ZipEntry {
     fn read_into_buf(&self) -> anyhow::Result<Vec<u8>> {
         // read_to_vec(&self.entry_name)
         // TODO: Implement zip archive handling
-        unimplemented!("ZipEntry::read_into_buf not implemented")
+        let mut archive = zip::ZipArchive::new(std::fs::File::open(&self.archive_name)?)?;
+        let mut file = archive.by_name(&self.entry_name)?;
+        let mut buffer = vec![];
+        file.read_to_end(&mut buffer)?;
+        Ok(buffer)
     }
 
-    fn get_fname(&self) -> &str {
-        self.entry_name.as_str()
+    fn get_fname(&self) -> String {
+        format! {"File: {} in {}", self.entry_name, self.archive_name}.clone()
+        // self.entry_name.clone()
     }
 }
 
@@ -126,17 +131,25 @@ impl TryFrom<&str> for Fnames {
 /// * `anyhow::Result<()>` - Returns an Ok result if processing is successful; otherwise, returns an error.
 pub(crate) fn process_files(pattern: &str, search_re: &Regex, quiet: &bool) -> anyhow::Result<()> {
     // TODO: Implement zip archive handling
-    // let zip_pattern = pattern.replace(".docx", ".zip");
-    // let zip_fnames = Fnames::try_from(zip_pattern.as_str())?;
-    // println!("Found {:?} zip archives\n", zip_fnames);
-    // can use par_bridge here, but this compromise seems better
+    let zip_pattern = pattern.replace(".docx", ".zip");
+    let zip_fnames = Fnames::try_from(zip_pattern.as_str())?;
+    println!("Found {:?} zip archives\n", zip_fnames);
+
+    // ! can use par_bridge here, but this compromise seems better
     let docx_fnames = Fnames::try_from(pattern)?;
     let nfiles = docx_fnames.fnames.len();
+    let nzips = zip_fnames.fnames.len();
     let mut file_surrogates: Vec<Box<dyn ReadIntoBuf + Send + Sync>> = Vec::new();
     for fname in &docx_fnames.fnames {
         file_surrogates.push(Box::new(RegularFile {
             fname: fname.clone(),
         }));
+    }
+    for zip_fname in zip_fnames.fnames {
+        let zipentries = zip_to_zipentries(&zip_fname)?;
+        for ze in zipentries {
+            file_surrogates.push(Box::new(ze));
+        }
     }
 
     file_surrogates
@@ -149,7 +162,7 @@ pub(crate) fn process_files(pattern: &str, search_re: &Regex, quiet: &bool) -> a
             }
         })
         .for_each(|search_result| print_result(&search_result, search_re, quiet));
-    println!("Searched {nfiles} files\n");
+    println!("Searched {nfiles} files amd {nzips} zip archives\n");
     println!(
         "  Search parameters: regex: {}, glob={:#?}\n\n",
         search_re, pattern
@@ -260,5 +273,14 @@ mod tests {
         let runs = xtract_text_from_doctree(&root, &search_re);
         assert_eq!(runs.len(), 1);
         assert_eq!(runs[0], "Hello, world!");
+    }
+
+    #[test]
+    fn test_zip_entry_name() {
+        let zip_entry = ZipEntry {
+            archive_name: "test.zip".to_string(),
+            entry_name: "test.docx".to_string(),
+        };
+        assert_eq!(zip_entry.get_fname(), "File: test.docx in test.zip");
     }
 }
