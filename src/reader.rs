@@ -74,8 +74,8 @@ impl ReadIntoBuf for ZipEntry {
     }
 }
 
-/// Parses a DOCX file specified by `file_name` and extracts text that matches the given regular
-/// expression `search_re`.
+/// Parses a DOCX file or archive entry specified by `file_like` (which must implement ReadIntoBuf)
+/// and extracts text that matches the given regular expression `search_re`.
 ///
 /// # Arguments
 ///
@@ -172,6 +172,12 @@ pub(crate) fn process_files(pattern: &str, search_re: &Regex, quiet: &bool) -> a
         "  Search parameters: regex: {}, glob={:#?}\n\n",
         search_re, pattern
     );
+    // for fname in &docx_fnames.fnames {
+    //     println!("Searched docx file  {}", fname);
+    // }
+    // for fname in &zip_fnames.fnames {
+    //     println!("Searched zip archive  {}", fname);
+    // }
     Ok(())
 }
 
