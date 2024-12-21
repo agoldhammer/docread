@@ -11,7 +11,7 @@ pub(crate) struct ZipEntry {
 pub(crate) fn zip_to_zipentries(zip_path: &str) -> anyhow::Result<Vec<ZipEntry>> {
     let file = File::open(zip_path)?;
     let mut archive = ZipArchive::new(file)?;
-    let mut docx_files = Vec::<ZipEntry>::new();
+    let mut zipentries = Vec::<ZipEntry>::new();
 
     for i in 0..archive.len() {
         let file = archive.by_index(i)?;
@@ -22,11 +22,11 @@ pub(crate) fn zip_to_zipentries(zip_path: &str) -> anyhow::Result<Vec<ZipEntry>>
                 archive_name: zip_path.to_string(),
                 entry_name: file_name.to_string(),
             };
-            docx_files.push(zip_entry);
+            zipentries.push(zip_entry);
         }
     }
 
-    Ok(docx_files)
+    Ok(zipentries)
 }
 #[cfg(test)]
 
