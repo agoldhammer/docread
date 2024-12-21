@@ -148,7 +148,7 @@ pub(crate) fn process_files(pattern: &str, search_re: &Regex, quiet: &bool) -> a
             fname: fname.clone(),
         }));
     }
-    for zip_fname in zip_fnames.fnames {
+    for zip_fname in &zip_fnames.fnames {
         let zipentries = zip_to_zipentries(&zip_fname)?;
         for ze in zipentries {
             file_surrogates.push(Box::new(ze));
@@ -172,12 +172,12 @@ pub(crate) fn process_files(pattern: &str, search_re: &Regex, quiet: &bool) -> a
         "  Search parameters: regex: {}, glob={:#?}\n\n",
         search_re, pattern
     );
-    // for fname in &docx_fnames.fnames {
-    //     println!("Searched docx file  {}", fname);
-    // }
-    // for fname in &zip_fnames.fnames {
-    //     println!("Searched zip archive  {}", fname);
-    // }
+    for fname in &docx_fnames.fnames {
+        println!("Searched docx file  {}", fname);
+    }
+    for fname in &zip_fnames.fnames {
+        println!("Searched zip archive  {}", fname);
+    }
     Ok(())
 }
 
