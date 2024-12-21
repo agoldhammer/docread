@@ -149,7 +149,7 @@ pub(crate) fn process_files(pattern: &str, search_re: &Regex, quiet: &bool) -> a
         }));
     }
     for zip_fname in &zip_fnames.fnames {
-        let zipentries = zip_to_zipentries(&zip_fname)?;
+        let zipentries = zip_to_zipentries(zip_fname)?;
         for ze in zipentries {
             file_surrogates.push(Box::new(ze));
         }
