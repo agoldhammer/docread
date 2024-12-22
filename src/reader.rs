@@ -11,6 +11,7 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use crate::matcher;
+use crate::selector::make_path;
 use crate::ziphandler::{zip_to_zipentries, ZipEntry};
 
 struct SearchResult {
@@ -133,9 +134,10 @@ impl TryFrom<&str> for Fnames {
 pub(crate) fn process_files(pattern: &str, search_re: &Regex, quiet: &bool) -> anyhow::Result<()> {
     // output mutex
     let output_mutex = Arc::new(Mutex::new(0));
+    let base_path = make_path(pattern);
     // done: Implement zip archive handling
-    let zip_pattern = pattern.replace(".docx", ".zip");
-    let zip_fnames = Fnames::try_from(zip_pattern.as_str())?;
+    let zip_path = base_path.replace(".docx", ".zip");
+    let zip_fnames = Fnames::try_from(zip_path.as_str())?;
     println!("Found {:?} zip archives\n", zip_fnames);
 
     // ! can use par_bridge here, but this compromise seems better
@@ -169,8 +171,8 @@ pub(crate) fn process_files(pattern: &str, search_re: &Regex, quiet: &bool) -> a
         });
     println!("Searched {nfiles} files amd {nzips} zip archives\n");
     println!(
-        "  Search parameters: regex: {}, glob={:#?}\n\n",
-        search_re, pattern
+        "  Search parameters: regex: {}, base_path={:#?}\n\n",
+        search_re, base_path
     );
     for fname in &docx_fnames.fnames {
         println!("Searched docx file  {}", fname);

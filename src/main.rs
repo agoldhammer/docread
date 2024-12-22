@@ -3,6 +3,7 @@ use regex::Regex;
 
 mod matcher;
 mod reader;
+mod selector;
 mod ziphandler;
 use reader::process_files;
 
@@ -18,10 +19,10 @@ struct Args {
     #[arg(
         short,
         long,
-        default_value = "**/*.docx",
-        help = "Must enclose in quotes"
+        default_value = ".",
+        help = "top-leveldir or file name to search for docx or zip files"
     )]
-    glob: String,
+    dir: String,
     #[arg(short, long, help = "show file names & match status only")]
     quiet: bool,
 }
@@ -35,11 +36,6 @@ struct Args {
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let re = Regex::new(&args.regex).unwrap();
-    let valid_glob = args.glob.ends_with(".docx");
-    if valid_glob {
-        process_files(&args.glob, &re, &args.quiet)?;
-    } else {
-        eprintln!("Glob pattern {} does not end with .docx", args.glob);
-    }
+    process_files(&args.dir, &re, &args.quiet)?;
     Ok(())
 }
