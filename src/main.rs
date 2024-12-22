@@ -20,7 +20,7 @@ struct Args {
         short,
         long,
         default_value = ".",
-        help = "top-leveldir or file name to search for docx or zip files"
+        help = "top-level dir or file name to search for docx or zip files"
     )]
     dir: String,
     #[arg(short, long, help = "show file names & match status only")]
