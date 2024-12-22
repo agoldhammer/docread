@@ -141,7 +141,7 @@ pub(crate) fn process_files(pattern: &str, search_re: &Regex, quiet: &bool) -> a
     println!("Found {:?} zip archives\n", zip_fnames);
 
     // ! can use par_bridge here, but this compromise seems better
-    let docx_fnames = Fnames::try_from(pattern)?;
+    let docx_fnames = Fnames::try_from(base_path.as_str())?;
     let nfiles = docx_fnames.fnames.len();
     let nzips = zip_fnames.fnames.len();
     let mut file_surrogates: Vec<Box<dyn ReadIntoBuf + Send + Sync>> = Vec::new();

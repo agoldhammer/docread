@@ -72,6 +72,37 @@ pub(crate) fn segment_on_regex(s: &str, re: &Regex) -> Vec<MatchTriple> {
     triples
 }
 
+#[macro_export]
+macro_rules! truncate_str {
+    ($s:expr, $n:expr) => {{
+        let s: &str = $s;
+        if s.chars().count() <= $n {
+            s.to_string()
+        } else {
+            let chars: Vec<char> = s.chars().collect();
+            let mut last_space = None;
+            let mut char_count = 0;
+
+            // Find the last space within the limit
+            for (i, &c) in chars.iter().enumerate() {
+                if char_count >= $n {
+                    break;
+                }
+                if c.is_whitespace() {
+                    last_space = Some(i);
+                }
+                char_count += 1;
+            }
+
+            // If we found a space, truncate there; otherwise take full characters
+            match last_space {
+                Some(pos) => chars[..pos].iter().collect::<String>(),
+                None => chars.iter().take($n).collect::<String>(),
+            }
+        }
+    }};
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,6 +118,8 @@ mod tests {
         assert_eq!(mtriples[0].1, "Hello");
         assert_eq!(mtriples[0].2, ", world!");
     }
+
+    // Tests to verify the macro works correctly
 
     #[test]
     fn test_segment_on_regex_multi() {
@@ -110,5 +143,40 @@ mod tests {
         assert_eq!(mtriples[4].0, "er ");
         assert_eq!(mtriples[4].1, "th");
         assert_eq!(mtriples[4].2, "ing");
+    }
+
+    #[test]
+    fn test_truncate() {
+        let s = "Hello, world!";
+        // let mt = "";
+        let x = "🦀 Rust is awesome";
+        assert_eq!(&s[..5], "Hello");
+        assert_eq!(&s[6..], " world!");
+        assert_eq!(&s[13..], "");
+        assert_eq!(&x[..6], "🦀 Rust");
+        // assert_eq!(&s[..50], "Hello, world!");
+        // assert_eq!(&mt[..10], "");
+        // assert_eq!(&mt[..10], "");
+    }
+
+    #[test]
+    fn test_truncate_str() {
+        // Basic truncation
+        assert_eq!(truncate_str!("Hello, world!", 5), "Hello");
+        assert_eq!(truncate_str!("Hello", 10), "Hello");
+
+        // Word boundary tests
+        assert_eq!(truncate_str!("Hello beautiful world", 10), "Hello");
+        assert_eq!(truncate_str!("Hello-beautiful world", 10), "Hello-beau");
+        assert_eq!(truncate_str!("ThisIsAVeryLongWord", 10), "ThisIsAVer");
+
+        // Unicode tests
+        // assert_eq!(truncate_str!("🦀 Rust is awesome", 6), "🦀 Rust");
+        // assert_eq!(truncate_str!("🦀 Rust", 2), "🦀");
+
+        // Edge cases
+        assert_eq!(truncate_str!("", 5), "");
+        assert_eq!(truncate_str!("   ", 2), "");
+        assert_eq!(truncate_str!("NoSpaces", 3), "NoS");
     }
 }

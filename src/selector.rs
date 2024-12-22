@@ -24,5 +24,6 @@ mod tests {
         assert_eq!(make_path("test.docx"), "test.docx");
         assert_eq!(make_path("test.zip"), "test/**/*.docx");
         assert_eq!(make_path("test/"), "test/**/*.docx");
+        assert_eq!(make_path("."), "./**/*.docx");
     }
 }
