@@ -180,7 +180,13 @@ pub(crate) fn process_files(
                 n_context_chars,
             )
         });
-    println!("Searched {nfiles} files amd {nzips} zip archives\n");
+    let fileword = if nfiles == 1 { "file" } else { "files" };
+    let zipword = if nzips == 1 {
+        "zip archive"
+    } else {
+        "zip archives"
+    };
+    println!("Searched {nfiles} {fileword} amd {nzips} {zipword}\n");
     println!(
         "  Search parameters: regex: {}, base_path={:#?}\n\n",
         search_re, base_path
