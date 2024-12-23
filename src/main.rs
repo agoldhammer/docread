@@ -44,6 +44,6 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let re = Regex::new(&args.regex).unwrap();
     let n_context_chars = args.context.parse::<usize>()?;
-    process_files(&args.dir, &re, &args.quiet, n_context_chars)?;
+    process_files(&args.dir, &re, args.quiet, n_context_chars)?;
     Ok(())
 }

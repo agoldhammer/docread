@@ -75,12 +75,12 @@ impl ReadIntoBuf for ZipEntry {
     }
 }
 
-/// Parses a DOCX file or archive entry specified by `file_like` (which must implement ReadIntoBuf)
+/// Parses a DOCX file or archive entry specified by `file_like` (which must implement `ReadIntoBuf`)
 /// and extracts text that matches the given regular expression `search_re`.
 ///
 /// # Arguments
 ///
-/// * `file_like` - A reference to the name of a file_like object (docx or zip subarchive) to be parsed.
+/// * `file_like` - A reference to the name of a `file_like` object (docx or zip subarchive) to be parsed.
 /// * `search_re` - A reference to the regular expression used to find matching text within the DOCX file.
 ///
 /// # Returns
@@ -134,7 +134,7 @@ impl TryFrom<&str> for Fnames {
 pub(crate) fn process_files(
     pattern: &str,
     search_re: &Regex,
-    quiet: &bool,
+    quiet: bool,
     n_context_chars: usize,
 ) -> anyhow::Result<()> {
     // output mutex
@@ -178,7 +178,7 @@ pub(crate) fn process_files(
                 quiet,
                 output_mutex.clone(),
                 n_context_chars,
-            )
+            );
         });
     let fileword = if nfiles == 1 { "file" } else { "files" };
     let zipword = if nzips == 1 {
@@ -218,7 +218,7 @@ pub(crate) fn process_files(
 fn print_result(
     result: &SearchResult,
     re: &Regex,
-    quiet: &bool,
+    quiet: bool,
     output_mutex: Arc<Mutex<u32>>,
     n_context_chars: usize,
 ) {
@@ -226,7 +226,7 @@ fn print_result(
     println!("Searched file--> {}\n", result.file_name.bright_red());
     match &result.maybe_result {
         Ok(runs) => {
-            if *quiet {
+            if quiet {
                 if !runs.is_empty() {
                     let runs_len = format!("Matched {} runs", runs.len())
                         .bright_green()
