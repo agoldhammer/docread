@@ -2,6 +2,29 @@ use colored::Colorize;
 use regex::Regex;
 use std::fmt::{self, Display, Formatter};
 
+#[macro_export]
+/// Truncate a string to the first `n` characters, or return the string if it is shorter than `n`.
+macro_rules! first_n_chars {
+    ($s:expr, $n:expr) => {{
+        let s: &str = $s;
+        s.char_indices().nth($n).map(|(i, _)| &s[..i]).unwrap_or(s)
+    }};
+}
+
+#[macro_export]
+/// Truncate a string to the last `n` characters, or return the string if it is shorter than `n`.
+macro_rules! last_n_chars {
+    ($s:expr, $n:expr) => {{
+        let s: &str = $s;
+        let len = s.len();
+        s.char_indices()
+            .rev()
+            .nth($n - 1)
+            .map(|(i, _)| &s[i..len])
+            .unwrap_or(s)
+    }};
+}
+
 #[derive(Debug)]
 #[allow(dead_code)]
 pub(crate) struct MatchTriple(
@@ -45,6 +68,7 @@ impl Display for MatchTriple {
 /// element of the `MatchTriple` will be an empty string. If the regular expression matches the end
 /// of the string, the third element of the `MatchTriple` will be an empty string.
 pub(crate) fn segment_on_regex(s: &str, re: &Regex) -> Vec<MatchTriple> {
+    let context_len = 20;
     let mut segments = Vec::new();
     let mut start = 0;
     let mut end;
@@ -70,37 +94,6 @@ pub(crate) fn segment_on_regex(s: &str, re: &Regex) -> Vec<MatchTriple> {
         triples.push(mtriple);
     });
     triples
-}
-
-#[macro_export]
-macro_rules! truncate_str {
-    ($s:expr, $n:expr) => {{
-        let s: &str = $s;
-        if s.chars().count() <= $n {
-            s.to_string()
-        } else {
-            let chars: Vec<char> = s.chars().collect();
-            let mut last_space = None;
-            let mut char_count = 0;
-
-            // Find the last space within the limit
-            for (i, &c) in chars.iter().enumerate() {
-                if char_count >= $n {
-                    break;
-                }
-                if c.is_whitespace() {
-                    last_space = Some(i);
-                }
-                char_count += 1;
-            }
-
-            // If we found a space, truncate there; otherwise take full characters
-            match last_space {
-                Some(pos) => chars[..pos].iter().collect::<String>(),
-                None => chars.iter().take($n).collect::<String>(),
-            }
-        }
-    }};
 }
 
 #[cfg(test)]
@@ -149,34 +142,47 @@ mod tests {
     fn test_truncate() {
         let s = "Hello, world!";
         // let mt = "";
-        let x = "🦀 Rust is awesome";
+        // let x = "🦀 Rust";
         assert_eq!(&s[..5], "Hello");
         assert_eq!(&s[6..], " world!");
         assert_eq!(&s[13..], "");
-        assert_eq!(&x[..6], "🦀 Rust");
+        // assert_eq!(&x[..6], "🦀 Rust");
         // assert_eq!(&s[..50], "Hello, world!");
         // assert_eq!(&mt[..10], "");
         // assert_eq!(&mt[..10], "");
     }
 
     #[test]
-    fn test_truncate_str() {
+    fn test_first_n_chars() {
         // Basic truncation
-        assert_eq!(truncate_str!("Hello, world!", 5), "Hello");
-        assert_eq!(truncate_str!("Hello", 10), "Hello");
+        assert_eq!(first_n_chars!("Hello, world!", 5), "Hello");
+        assert_eq!(first_n_chars!("Hello", 10), "Hello");
 
         // Word boundary tests
-        assert_eq!(truncate_str!("Hello beautiful world", 10), "Hello");
-        assert_eq!(truncate_str!("Hello-beautiful world", 10), "Hello-beau");
-        assert_eq!(truncate_str!("ThisIsAVeryLongWord", 10), "ThisIsAVer");
+        assert_eq!(first_n_chars!("Hello beautiful world", 10), "Hello beau");
+        assert_eq!(first_n_chars!("Hello-beautiful world", 10), "Hello-beau");
+        assert_eq!(first_n_chars!("ThisIsAVeryLongWord", 10), "ThisIsAVer");
 
         // Unicode tests
-        // assert_eq!(truncate_str!("🦀 Rust is awesome", 6), "🦀 Rust");
-        // assert_eq!(truncate_str!("🦀 Rust", 2), "🦀");
+        assert_eq!(first_n_chars!("🦀 Rust is awesome", 6), "🦀 Rust");
+        assert_eq!(first_n_chars!("🦀 Rust", 2), "🦀 ");
 
         // Edge cases
-        assert_eq!(truncate_str!("", 5), "");
-        assert_eq!(truncate_str!("   ", 2), "");
-        assert_eq!(truncate_str!("NoSpaces", 3), "NoS");
+        assert_eq!(first_n_chars!("", 5), "");
+        assert_eq!(first_n_chars!("   ", 2), "  ");
+        assert_eq!(first_n_chars!("NoSpaces", 3), "NoS");
+        assert_eq!(first_n_chars!("Célimène", 3), "Cél");
+        assert_eq!(first_n_chars!("Célimène", 50), "Célimène");
+    }
+
+    #[test]
+    fn test_last_n_chars() {
+        assert_eq!(last_n_chars!("Hello, world!", 5), "orld!");
+        assert_eq!(last_n_chars!("Hello", 10), "Hello");
+        assert_eq!(last_n_chars!("Hello beautiful world", 10), "iful world");
+        assert_eq!(last_n_chars!("", 10), "");
+        assert_eq!(last_n_chars!("   ", 2), "  ");
+        assert_eq!(last_n_chars!("NoSpaces", 3), "ces");
+        assert_eq!(last_n_chars!("Célimène", 3), "ène");
     }
 }
