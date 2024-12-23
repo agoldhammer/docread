@@ -68,24 +68,28 @@ impl Display for MatchTriple {
 /// element of the `MatchTriple` will be an empty string. If the regular expression matches the end
 /// of the string, the third element of the `MatchTriple` will be an empty string.
 pub(crate) fn segment_on_regex(s: &str, re: &Regex) -> Vec<MatchTriple> {
-    let context_len = 20;
+    let context_len = 100;
     let mut segments = Vec::new();
     let mut start = 0;
     let mut end;
     let mut end_of_prev_match = 0usize;
     for m in re.find_iter(s) {
         end = m.start();
+        // push postamble if there is any
         if end_of_prev_match > 0 {
-            segments.push(s[end_of_prev_match..end].to_string());
+            segments.push(first_n_chars!(&s[end_of_prev_match..end], context_len).to_string());
         }
-        segments.push(s[start..end].to_string());
+        // push preamble
+        segments.push(last_n_chars!(&s[start..end], context_len).to_string()); // push preamble.push(s[start..end].to_string());
         let matched = m.as_str().to_string();
         end_of_prev_match = m.end();
         start = end + matched.len();
+        // push match itself
         segments.push(matched);
     }
     if start < s.len() {
-        segments.push(s[start..].to_string());
+        // push postamble of last match
+        segments.push(first_n_chars!(&s[start..], context_len).to_string()); // segments.push(s[start..].to_string());
     }
     let mut triples: Vec<MatchTriple> = Vec::new();
     segments.chunks(3).for_each(|chunk| {
