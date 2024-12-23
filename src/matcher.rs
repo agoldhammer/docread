@@ -142,20 +142,6 @@ mod tests {
     }
 
     #[test]
-    fn test_truncate() {
-        let s = "Hello, world!";
-        // let mt = "";
-        // let x = "🦀 Rust";
-        assert_eq!(&s[..5], "Hello");
-        assert_eq!(&s[6..], " world!");
-        assert_eq!(&s[13..], "");
-        // assert_eq!(&x[..6], "🦀 Rust");
-        // assert_eq!(&s[..50], "Hello, world!");
-        // assert_eq!(&mt[..10], "");
-        // assert_eq!(&mt[..10], "");
-    }
-
-    #[test]
     fn test_first_n_chars() {
         // Basic truncation
         assert_eq!(first_n_chars!("Hello, world!", 5), "Hello");
