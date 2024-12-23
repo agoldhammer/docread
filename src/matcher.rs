@@ -92,8 +92,8 @@ pub(crate) fn segment_on_regex(s: &str, re: &Regex, context_len: usize) -> Vec<M
     }
     let mut triples: Vec<MatchTriple> = Vec::new();
     segments.chunks(3).for_each(|chunk| {
-        let triple: Vec<String> = chunk.iter().map(|s| s.to_owned()).collect();
-        let mtriple = MatchTriple::from_iter(triple);
+        // !ReMOVE this line: let triple: Vec<String> = chunk.iter().map(|s| s.to_owned()).collect();
+        let mtriple = MatchTriple::from_iter(chunk.to_owned());
         triples.push(mtriple);
     });
     triples

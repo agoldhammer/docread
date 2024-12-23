@@ -143,7 +143,7 @@ pub(crate) fn process_files(
     // done: Implement zip archive handling
     let zip_path = base_path.replace(".docx", ".zip");
     let zip_fnames = Fnames::try_from(zip_path.as_str())?;
-    println!("Found {:?} zip archives\n", zip_fnames);
+    // println!("Found {:?} zip archives\n", zip_fnames);
 
     // ! can use par_bridge here, but this compromise seems better
     let docx_fnames = Fnames::try_from(base_path.as_str())?;
