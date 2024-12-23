@@ -23,6 +23,13 @@ struct Args {
         help = "top-level dir or file name to search for docx or zip files"
     )]
     dir: String,
+    #[arg(
+        short,
+        long,
+        default_value = "75",
+        help = "number of context chars to show before/after matches"
+    )]
+    context: String,
     #[arg(short, long, help = "show file names & match status only")]
     quiet: bool,
 }
@@ -36,6 +43,7 @@ struct Args {
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let re = Regex::new(&args.regex).unwrap();
-    process_files(&args.dir, &re, &args.quiet)?;
+    let n_context_chars = args.context.parse::<usize>()?;
+    process_files(&args.dir, &re, &args.quiet, n_context_chars)?;
     Ok(())
 }

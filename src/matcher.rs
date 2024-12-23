@@ -67,8 +67,7 @@ impl Display for MatchTriple {
 /// following the match. If the regular expression matches the beginning of the string, the first
 /// element of the `MatchTriple` will be an empty string. If the regular expression matches the end
 /// of the string, the third element of the `MatchTriple` will be an empty string.
-pub(crate) fn segment_on_regex(s: &str, re: &Regex) -> Vec<MatchTriple> {
-    let context_len = 100;
+pub(crate) fn segment_on_regex(s: &str, re: &Regex, context_len: usize) -> Vec<MatchTriple> {
     let mut segments = Vec::new();
     let mut start = 0;
     let mut end;
@@ -108,7 +107,7 @@ mod tests {
     fn test_segment_on_regex() {
         let s = "Hello, world!";
         let re = Regex::new(r"[Hh]ello").unwrap();
-        let mtriples = segment_on_regex(s, &re);
+        let mtriples = segment_on_regex(s, &re, 1000);
         println!("{:?}", mtriples);
         assert_eq!(mtriples.len(), 1);
         assert_eq!(mtriples[0].0, "");
@@ -122,7 +121,7 @@ mod tests {
     fn test_segment_on_regex_multi() {
         let s = "This, that, and the other thing";
         let re = Regex::new(r"[Tt]h").unwrap();
-        let mtriples = segment_on_regex(s, &re);
+        let mtriples = segment_on_regex(s, &re, 1000);
         println!("{:?}", mtriples);
         assert_eq!(mtriples.len(), 5);
         assert_eq!(mtriples[0].0, "");

@@ -131,7 +131,12 @@ impl TryFrom<&str> for Fnames {
 /// # Returns
 ///
 /// * `anyhow::Result<()>` - Returns an Ok result if processing is successful; otherwise, returns an error.
-pub(crate) fn process_files(pattern: &str, search_re: &Regex, quiet: &bool) -> anyhow::Result<()> {
+pub(crate) fn process_files(
+    pattern: &str,
+    search_re: &Regex,
+    quiet: &bool,
+    n_context_chars: usize,
+) -> anyhow::Result<()> {
     // output mutex
     let output_mutex = Arc::new(Mutex::new(0));
     let base_path = make_path(pattern);
@@ -167,7 +172,13 @@ pub(crate) fn process_files(pattern: &str, search_re: &Regex, quiet: &bool) -> a
             }
         })
         .for_each(|search_result| {
-            print_result(&search_result, search_re, quiet, output_mutex.clone())
+            print_result(
+                &search_result,
+                search_re,
+                quiet,
+                output_mutex.clone(),
+                n_context_chars,
+            )
         });
     println!("Searched {nfiles} files amd {nzips} zip archives\n");
     println!(
@@ -198,7 +209,13 @@ pub(crate) fn process_files(pattern: &str, search_re: &Regex, quiet: &bool) -> a
 /// when `quiet` is true. Otherwise, it iterates through each match and prints details in a formatted
 /// manner, using `segment_on_regex` to divide the text into segments. If there's an error (`Err` variant),
 /// the error is printed to standard error.
-fn print_result(result: &SearchResult, re: &Regex, quiet: &bool, output_mutex: Arc<Mutex<u32>>) {
+fn print_result(
+    result: &SearchResult,
+    re: &Regex,
+    quiet: &bool,
+    output_mutex: Arc<Mutex<u32>>,
+    n_context_chars: usize,
+) {
     let _output_guard = output_mutex.lock().unwrap();
     println!("Searched file--> {}\n", result.file_name.bright_red());
     match &result.maybe_result {
@@ -215,7 +232,7 @@ fn print_result(result: &SearchResult, re: &Regex, quiet: &bool, output_mutex: A
                 }
             } else {
                 for (run_index, run) in runs.iter().enumerate() {
-                    let mtriples = matcher::segment_on_regex(run, re);
+                    let mtriples = matcher::segment_on_regex(run, re, n_context_chars);
                     for (match_index, mtriple) in mtriples.iter().enumerate() {
                         let prompt = format!("{}-{}", run_index + 1, match_index + 1);
                         println!("  {}-> {}\n", prompt.bright_yellow().on_blue(), mtriple);
