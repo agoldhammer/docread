@@ -26,7 +26,6 @@ macro_rules! last_n_chars {
 }
 
 #[derive(Debug)]
-#[allow(dead_code)]
 pub(crate) struct MatchTriple(
     String, //preamble
     String, //matched
