@@ -10,4 +10,4 @@ Todo:
 - [x] allow specification of context length on matches
 - [ ] refactor handling of docx and zip into separate files
 - [ ] add pdf processing
-- [ ] plug-ins?
+- [ ] replace glob with walkdir and allow zip, docx, and pdf to be specified independently
