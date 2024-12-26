@@ -26,7 +26,10 @@ struct SearchResult {
 /// Will return an error if the file cannot be opened or read to the end.
 fn read_to_vec(path: &str) -> anyhow::Result<Vec<u8>> {
     let mut buf = Vec::new();
-    std::fs::File::open(path)?.read_to_end(&mut buf)?;
+    std::fs::File::open(path)
+        .with_context(|| format!("Failed to open file: {}", path))?
+        .read_to_end(&mut buf)
+        .with_context(|| format!("Failed to read file: {}", path))?;
     Ok(buf)
 }
 
