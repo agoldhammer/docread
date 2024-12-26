@@ -5,6 +5,7 @@ use serde_json::Value;
 use std::io::Read;
 type Run = String;
 type Runs = Vec<Run>;
+use anyhow::Context;
 use colored::Colorize;
 use rayon::prelude::*;
 use std::collections::VecDeque;
@@ -74,7 +75,6 @@ impl ReadIntoBuf for ZipEntry {
 
     fn get_fname(&self) -> String {
         format! {"File: {} in {}", self.entry_name, self.archive_name}.clone()
-        // self.entry_name.clone()
     }
 }
 
