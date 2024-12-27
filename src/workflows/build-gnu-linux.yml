@@ -1,0 +1,26 @@
+name: GNU/Linux
+
+on:
+  release:
+    types: [created]
+
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build_and_test:
+    name: Build and test
+    runs-on: ubuntu-latest
+
+    steps:
+    - run: git config --global core.autocrlf false
+
+    - name: "Checkout repository"
+      uses: actions/checkout@v4
+    
+    - name: Build
+      run: cargo build --all --locked --verbose
+    
+    - name: Run tests
+      run: cargo test --verbose
