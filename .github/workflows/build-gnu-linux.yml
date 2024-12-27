@@ -18,9 +18,23 @@ jobs:
 
     - name: "Checkout repository"
       uses: actions/checkout@v4
-    
-    - name: Build
-      run: cargo build --all --locked --verbose
-    
+
     - name: Run tests
       run: cargo test --verbose
+    
+    - name: Build
+      run: cargo build --release --target x86_64-unknown-linux-musl
+    
+    - name: Tar x86_64 binary
+      run: tar -czvf docread-gnu-linux-x86_64.tar.gz -C target/x86_64-unknown-linux-musl/release docread
+
+    - name: Generate SHA256 checksums
+      run: |
+        shasum -a 256 docread-gnu-linux-x86_64.tar.gz > docread-gnu-linux-x86_64.tar.gz.sha256
+
+    - name: Upload release binaries
+      uses: alexellis/upload-assets@0.4.0
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      with:
+        asset_paths: '["docread-gnu-linux-x86_64.tar.gz",  "docread-gnu-linux-x86_64.tar.gz.sha256"]'
