@@ -40,7 +40,7 @@ jobs:
     - name: Generate SHA256 checksums
       run: |
         shasum -a 256 docread-gnu-linux-x86_64.tar.gz > docread-gnu-linux-x86_64.tar.gz.sha256
-        shasum -a 256 textpod-windows.zip > docread-windows.zip.sha256
+        shasum -a 256 docread-windows.zip > docread-windows.zip.sha256
   
     - name: Upload release binaries
       uses: alexellis/upload-assets@0.4.0
