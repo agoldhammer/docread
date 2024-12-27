@@ -323,4 +323,14 @@ mod tests {
         };
         assert_eq!(zip_entry.get_fname(), "File: test.docx in test.zip");
     }
+
+    #[test]
+    fn test_read_to_vec() {
+        let _: Vec<u8> = Vec::new();
+        let res = read_to_vec("nonexistent.docx");
+        match res {
+            Ok(_) => panic!("Expected an error"),
+            Err(e) => assert_eq!(e.to_string(), "Failed to open file: nonexistent.docx"),
+        }
+    }
 }
