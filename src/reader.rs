@@ -325,7 +325,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_to_vec() {
+    fn test_read_to_vec_error() {
         let _: Vec<u8> = Vec::new();
         let res = read_to_vec("nonexistent.docx");
         match res {
