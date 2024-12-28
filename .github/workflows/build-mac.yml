@@ -27,10 +27,15 @@ jobs:
       - name: Build
         run: cargo build --release --target x86_64-apple-darwin --target aarch64-apple-darwin
 
+      - name: Tar x86_64 binary
+        run: |
+          tar -czvf docread-x86_64-apple-darwin.tar.gz -C target/x86_64-apple-darwin/release docread
+          tar -czvf docread-aarch64-apple-darwin.tar.gz -C target/aarch64-apple-darwin/release docread
+
       - name: Generate SHA256 checksums
         run: |
-          shasum -a 256 target/x86_64-apple-darwin/release/docread > docread-x86_64.sha256
-          shasum -a 256 target/aarch64-apple-darwin/release/docread > docread-aarch64.sha256
+          shasum -a 256 docread-x86_64-apple-darwin.tar.gz > docread-x86_64-apple-darwin.sha256
+          shasum -a 256 docread-aarch64-apple-darwin.tar.gz > docread-aarch64-apple-darwin.sha256
 
       - name: Upload release binaries
         uses: alexellis/upload-assets@0.4.0
