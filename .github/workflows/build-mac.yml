@@ -1,0 +1,43 @@
+name: Mac Build, Test, and Release (x86-64 and arm64)
+
+on:
+  release:
+    types: [created]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build_and_test:
+    name: Build and test
+    runs-on: macos-latest
+
+    steps:
+      - run: git config --global core.autocrlf false
+
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+
+      - name: Install rustup targets
+        run: rustup target add x86_64-apple-darwin aarch64-apple-darwin
+
+      - name: Run tests
+        run: cargo test --verbose
+
+      - name: Build
+        run: cargo build --release --target x86_64-apple-darwin --target aarch64-apple-darwin
+
+      - name: Generate SHA256 checksums
+        run: |
+          sha256sum target/x86_64-apple-darwin/release/docread > docread-x86_64.sha256
+          sha256sum target/aarch64-apple-darwin/release/docread > docread-aarch64.sha256
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: docread
+          path: |
+            target/x86_64-apple-darwin/release/docread
+            target/aarch64-apple-darwin/release/docread
+            docread-x86_64.sha256
+            docread-aarch64.sha256
