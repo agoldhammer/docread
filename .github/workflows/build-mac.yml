@@ -29,8 +29,8 @@ jobs:
 
       - name: Generate SHA256 checksums
         run: |
-          sha256sum target/x86_64-apple-darwin/release/docread > docread-x86_64.sha256
-          sha256sum target/aarch64-apple-darwin/release/docread > docread-aarch64.sha256
+          shasum -a 256 target/x86_64-apple-darwin/release/docread > docread-x86_64.sha256
+          shasum -a 256 target/aarch64-apple-darwin/release/docread > docread-aarch64.sha256
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
