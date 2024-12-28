@@ -42,4 +42,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
-          asset_paths: '["docread-x86_64-apple-darwin.tar.gz", "docread-aarch64-apple-darwin.zip",  "docread-x86_64.sha256", "docread-aarch64.sha256"]'
+          asset_paths: '["docread-x86_64-apple-darwin.tar.gz", "docread-aarch64-apple-darwin.tar.gz",  "docread-x86_64.-apple-darwin.sha256", "docread-aarch64-apple-darwin.sha256"]'
