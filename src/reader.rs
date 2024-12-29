@@ -1,5 +1,4 @@
 use docx_rs::*;
-use glob::glob;
 use regex::Regex;
 use serde_json::Value;
 use std::io::Read;
@@ -12,7 +11,7 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use crate::matcher;
-use crate::selector::make_path;
+use crate::selector::make_fnames;
 use crate::ziphandler::{zip_to_zipentries, ZipEntry};
 
 struct SearchResult {
@@ -64,8 +63,6 @@ impl ReadIntoBuf for RegularFile {
 
 impl ReadIntoBuf for ZipEntry {
     fn read_into_buf(&self) -> anyhow::Result<Vec<u8>> {
-        // read_to_vec(&self.entry_name)
-        // TODO: Implement zip archive handling
         let mut archive = zip::ZipArchive::new(std::fs::File::open(&self.archive_name)?)?;
         let mut file = archive.by_name(&self.entry_name)?;
         let mut buffer = vec![];
@@ -101,33 +98,12 @@ fn parse_docx(
     Ok(matched_runs)
 }
 
-#[derive(Debug)]
-struct Fnames {
-    fnames: Vec<String>,
-}
-
-impl TryFrom<&str> for Fnames {
-    type Error = anyhow::Error;
-    /// Attempts to create a `Fnames` from a glob pattern. The `glob` crate is used to find all
-    /// matching files, and the resulting paths are converted to `String`s and stored in the
-    /// `fnames` member of the `Fnames` struct.
-    ///
-    fn try_from(pattern: &str) -> anyhow::Result<Self> {
-        let fpaths = glob(pattern)?;
-        let fnames: Vec<String> = fpaths
-            .flatten()
-            .map(|p| format!("{}", p.display()))
-            .collect();
-        Ok(Fnames { fnames })
-    }
-}
-
 /// Processes files matching the given glob pattern, searching for text that matches the
 /// specified regular expression, and printing the results.
 ///
 /// # Arguments
 ///
-/// * `pattern` - A glob pattern to match files. Should end with `.docx`.
+/// * `base_dir` - A glob base_dir to match files`.
 /// * `search_re` - A regular expression used to search for matching text within each file.
 /// * `quiet` - A boolean flag to control whether minimal output is shown.
 ///
@@ -135,21 +111,15 @@ impl TryFrom<&str> for Fnames {
 ///
 /// * `anyhow::Result<()>` - Returns an Ok result if processing is successful; otherwise, returns an error.
 pub(crate) fn process_files(
-    pattern: &str,
+    base_dir: &str,
     search_re: &Regex,
     quiet: bool,
     n_context_chars: usize,
 ) -> anyhow::Result<()> {
     // output mutex
     let output_mutex = Arc::new(Mutex::new(0));
-    let base_path = make_path(pattern);
-    // done: Implement zip archive handling
-    let zip_path = base_path.replace(".docx", ".zip");
-    let zip_fnames = Fnames::try_from(zip_path.as_str())?;
-    // println!("Found {:?} zip archives\n", zip_fnames);
-
-    // ! can use par_bridge here, but this compromise seems better
-    let docx_fnames = Fnames::try_from(base_path.as_str())?;
+    let zip_fnames = make_fnames(base_dir, ".zip")?;
+    let docx_fnames = make_fnames(base_dir, ".docx")?;
     let nfiles = docx_fnames.fnames.len();
     let nzips = zip_fnames.fnames.len();
     let mut file_surrogates: Vec<Box<dyn ReadIntoBuf + Send + Sync>> = Vec::new();
@@ -192,7 +162,7 @@ pub(crate) fn process_files(
     println!("Searched {nfiles} {fileword} amd {nzips} {zipword}\n");
     println!(
         "  Search parameters: regex: {}, base_path={:#?}\n\n",
-        search_re, base_path
+        search_re, base_dir
     );
     for fname in &docx_fnames.fnames {
         println!("Searched docx file  {}", fname);

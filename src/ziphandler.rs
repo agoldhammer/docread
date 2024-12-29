@@ -76,7 +76,7 @@ mod tests {
 
     #[test]
     fn test_read_test_archive() -> anyhow::Result<()> {
-        let docx_files = zip_to_zipentries("src/TestArchive.zip")?;
+        let docx_files = zip_to_zipentries("resources/TestArchive.zip")?;
         assert_eq!(docx_files.len(), 2);
         assert_eq!(docx_files[0].entry_name, "BookNotes.docx");
         assert_eq!(docx_files[1].entry_name, "testdoc.docx");

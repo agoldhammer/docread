@@ -1,17 +1,41 @@
-/// Takes a path from the command line, trims any trailing slashes, and appends
-/// "/**/*.docx" if the path does not end with .docx or .zip. This is used to
-/// convert the user's path into a glob pattern that will match all .docx
-/// files in the given directory and its subdirectories.
-pub fn make_path(cli_path: &str) -> String {
-    let mut path = cli_path.to_string();
-    path = path.trim_end_matches('/').to_string();
-    path = path.trim_end_matches(".zip").to_string();
-    if path.ends_with(".docx") {
-        path.clone()
-    } else {
-        path.push_str("/**/*.docx");
-        path.clone()
+use glob::glob;
+
+#[derive(Debug)]
+pub(crate) struct Fnames {
+    pub fnames: Vec<String>,
+}
+
+impl TryFrom<&str> for Fnames {
+    type Error = anyhow::Error;
+    /// Attempts to create a `Fnames` from a glob pattern. The `glob` crate is used to find all
+    /// matching files, and the resulting paths are converted to `String`s and stored in the
+    /// `fnames` member of the `Fnames` struct.
+    ///
+    fn try_from(pattern: &str) -> anyhow::Result<Self> {
+        let fpaths = glob(pattern)?;
+        let fnames: Vec<String> = fpaths
+            .flatten()
+            .map(|p| format!("{}", p.display()))
+            .collect();
+        Ok(Fnames { fnames })
     }
+}
+
+/// Creates a `Fnames` containing all files in `base_dir` and all of its
+/// subdirectories that have the given `suffix`. The `glob` crate is used to
+/// find all matching files, and the resulting paths are converted to `String`s
+/// and stored in the `fnames` member of the returned `Fnames` struct.
+///
+/// # Errors
+///
+/// Will return an error if the glob pattern is invalid or if the glob
+/// pattern fails to match any files.
+pub fn make_fnames(base_dir: &str, suffix: &str) -> anyhow::Result<Fnames> {
+    let mut fpath = base_dir.trim_end_matches("/").to_string();
+    let extension = format!("/**/*{}", suffix);
+    fpath.push_str(extension.as_str());
+
+    Fnames::try_from(fpath.as_str())
 }
 
 #[cfg(test)]
@@ -20,10 +44,9 @@ mod tests {
 
     #[test]
     fn test_make_path() {
-        assert_eq!(make_path("test"), "test/**/*.docx");
-        assert_eq!(make_path("test.docx"), "test.docx");
-        assert_eq!(make_path("test.zip"), "test/**/*.docx");
-        assert_eq!(make_path("test/"), "test/**/*.docx");
-        assert_eq!(make_path("."), "./**/*.docx");
+        let base_dir = ".";
+        let suffix = ".docx";
+        let f = make_fnames(base_dir, suffix).unwrap();
+        assert_eq!(f.fnames.len(), 2);
     }
 }
