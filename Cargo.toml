@@ -2,9 +2,10 @@
 name = "docread"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
 
 [dependencies]
-anyhow = "1.0.93"
+anyhow = "1.0.95"
 clap = { version = "4.5.21", features = ["derive"] }
 colored = "2.1.0"
 docx-rs = "0.4.17"
