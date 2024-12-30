@@ -93,7 +93,16 @@ fn parse_docx(
     search_re: &Regex,
 ) -> anyhow::Result<Runs> {
     let buffer = file_like.read_into_buf()?;
-    let data: Value = serde_json::from_str(&read_docx(&buffer)?.json())?;
+    let data: Value = serde_json::from_str(
+        &read_docx(&buffer)
+            .with_context(|| {
+                format!(
+                    "Error decoding {}",
+                    file_like.get_fname().bright_red().on_black()
+                )
+            })?
+            .json(),
+    )?;
     let matched_runs = xtract_text_from_doctree(&data, search_re);
     Ok(matched_runs)
 }
@@ -116,6 +125,7 @@ pub(crate) fn process_files(
     quiet: bool,
     n_context_chars: usize,
     summary: bool,
+    unmatched_show: bool,
 ) -> anyhow::Result<()> {
     // output mutex
     let output_mutex = Arc::new(Mutex::new(0));
@@ -152,6 +162,7 @@ pub(crate) fn process_files(
                 quiet,
                 output_mutex.clone(),
                 n_context_chars,
+                unmatched_show,
             );
         });
     let fileword = if nfiles == 1 { "file" } else { "files" };
@@ -197,12 +208,13 @@ fn print_result(
     quiet: bool,
     output_mutex: Arc<Mutex<u32>>,
     n_context_chars: usize,
+    unmatched_show: bool,
 ) {
     let _output_guard = output_mutex.lock().unwrap();
-    println!("Searched file--> {}\n", result.file_name.bright_red());
     match &result.maybe_result {
         Ok(runs) => {
             if quiet {
+                println!("Searched file--> {}\n", result.file_name.bright_red());
                 if !runs.is_empty() {
                     let runs_len = format!("Matched {} runs", runs.len())
                         .bright_green()
@@ -213,6 +225,10 @@ fn print_result(
                     println!("{not_found}\n");
                 }
             } else {
+                if runs.is_empty() && !unmatched_show {
+                    return;
+                }
+                println!("Searched file--> {}\n", result.file_name.bright_red());
                 for (run_index, run) in runs.iter().enumerate() {
                     let mtriples = matcher::segment_on_regex(run, re, n_context_chars);
                     for (match_index, mtriple) in mtriples.iter().enumerate() {

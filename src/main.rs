@@ -39,6 +39,8 @@ struct Args {
     quiet: bool,
     #[arg(short, long, help = "show search summary")]
     summary: bool,
+    #[arg(short, long, help = "show files with no matches")]
+    unmatched_show: bool,
 }
 
 /// Search for the given regular expression in all .docx and zipped .docx files in the current directory,
@@ -50,6 +52,7 @@ struct Args {
 /// - `--context, -c`: number of context characters to show before/after matches (default: 75)
 /// - `--quiet, -q`: show file names & match status only
 /// - `--summary, -s`: show search summary
+/// - `--unmatched-show, -u`: show files with no matches
 /// - `--help, -h`: show help message
 /// - `--version, -V`: show version information
 ///
@@ -62,6 +65,13 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let re = Regex::new(&args.regex).unwrap();
     let n_context_chars = args.context.parse::<usize>()?;
-    process_files(&args.dir, &re, args.quiet, n_context_chars, args.summary)?;
+    process_files(
+        &args.dir,
+        &re,
+        args.quiet,
+        n_context_chars,
+        args.summary,
+        args.unmatched_show,
+    )?;
     Ok(())
 }

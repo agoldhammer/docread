@@ -22,10 +22,13 @@ Options:
           [default: 75]
 
   -q, --quiet
-          show file names & match status only
+          show file names & match status only (default: false)
 
   -s, --summary
-          list names of all files searched at end of output
+          list names of all files searched at end of output (default: false)
+
+  -u, --unmatched-show
+          include names of files without matches in output (default: false)
 
   -h, --help
           Print help (see a summary with '-h')
