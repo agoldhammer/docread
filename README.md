@@ -24,6 +24,9 @@ Options:
   -q, --quiet
           show file names & match status only
 
+  -s, --summary
+          list names of all files searched at end of output
+
   -h, --help
           Print help (see a summary with '-h')
 

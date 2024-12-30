@@ -115,6 +115,7 @@ pub(crate) fn process_files(
     search_re: &Regex,
     quiet: bool,
     n_context_chars: usize,
+    summary: bool,
 ) -> anyhow::Result<()> {
     // output mutex
     let output_mutex = Arc::new(Mutex::new(0));
@@ -164,11 +165,13 @@ pub(crate) fn process_files(
         "  Search parameters: regex: {}, base_path={:#?}\n\n",
         search_re, base_dir
     );
-    for fname in &docx_fnames.fnames {
-        println!("Searched docx file  {}", fname);
-    }
-    for fname in &zip_fnames.fnames {
-        println!("Searched zip archive  {}", fname);
+    if summary {
+        for fname in &docx_fnames.fnames {
+            println!("Searched docx file  {}", fname);
+        }
+        for fname in &zip_fnames.fnames {
+            println!("Searched zip archive  {}", fname);
+        }
     }
     Ok(())
 }
