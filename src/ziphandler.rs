@@ -8,6 +8,22 @@ pub(crate) struct ZipEntry {
     pub(crate) entry_name: String,
 }
 
+/// Returns a vector of `ZipEntry` objects, each representing a .docx file within
+/// the given zip archive. This function reads the zip archive and extracts the
+/// file names of all .docx files within it, and builds a vector of `ZipEntry`
+/// objects, each containing the name of the archive and the name of the .docx
+/// file. The result is a vector of `ZipEntry` objects, which can be used to
+/// process the .docx files within the archive.
+///
+/// # Arguments
+///
+/// * `zip_path` - The path to the zip archive.
+///
+/// # Returns
+///
+/// * `anyhow::Result<Vec<ZipEntry>>` - A result containing a vector of `ZipEntry`
+///   objects, or an error if the archive cannot be read or if the files within
+///   it cannot be extracted.
 pub(crate) fn zip_to_zipentries(zip_path: &str) -> anyhow::Result<Vec<ZipEntry>> {
     let file = File::open(zip_path)?;
     let mut archive = ZipArchive::new(file)?;
