@@ -9,8 +9,8 @@ use reader::process_files;
 
 #[derive(Parser, Debug)]
 #[command(
-    author = "agold",
-    version = "0.1.0",
+    author,
+    version,
     about,
     long_about = "Search for regular expressions in .docx and zipped .docx files"
 )]
