@@ -46,6 +46,15 @@ docread -r 'Hi|[Hh]ello' -d $HOME/docs -c 100
 
 ### Notes
 
+### Limitations
+
+- Matching is performed per text run, so a pattern spanning two runs never matches.
+  Word splits text into runs very readily (spell check, formatting changes), so
+  short patterns are more reliable than long ones.
+- Only the main document body is searched; headers, footers, footnotes, and
+  endnotes are skipped.
+- Zip archives nested inside zip archives are not searched.
+
 Todo:
 
 - [x] change file specification method

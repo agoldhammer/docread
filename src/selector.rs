@@ -13,10 +13,7 @@ impl TryFrom<&str> for Fnames {
     ///
     fn try_from(pattern: &str) -> anyhow::Result<Self> {
         let fpaths = glob(pattern)?;
-        let fnames: Vec<String> = fpaths
-            .flatten()
-            .map(|p| format!("{}", p.display()))
-            .collect();
+        let fnames: Vec<String> = fpaths.flatten().map(|p| p.display().to_string()).collect();
         Ok(Fnames { fnames })
     }
 }
@@ -28,8 +25,8 @@ impl TryFrom<&str> for Fnames {
 ///
 /// # Errors
 ///
-/// Will return an error if the glob pattern is invalid or if the glob
-/// pattern fails to match any files.
+/// Will return an error if the glob pattern is invalid. Returns an empty
+/// `Fnames` if no files match.
 pub fn make_fnames(base_dir: &str, suffix: &str) -> anyhow::Result<Fnames> {
     let mut fpath = base_dir.trim_end_matches("/").to_string();
     let extension = format!("/**/*{}", suffix);
@@ -41,12 +38,19 @@ pub fn make_fnames(base_dir: &str, suffix: &str) -> anyhow::Result<Fnames> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::File;
+    use tempfile::tempdir;
 
     #[test]
-    fn test_make_path() {
-        let base_dir = ".";
-        let suffix = ".docx";
-        let f = make_fnames(base_dir, suffix).unwrap();
+    fn test_make_fnames_finds_suffix_recursively() -> anyhow::Result<()> {
+        let dir = tempdir()?;
+        File::create(dir.path().join("one.docx"))?;
+        File::create(dir.path().join("notes.txt"))?;
+        std::fs::create_dir(dir.path().join("nested"))?;
+        File::create(dir.path().join("nested/two.docx"))?;
+
+        let f = make_fnames(dir.path().to_str().unwrap(), ".docx")?;
         assert_eq!(f.fnames.len(), 2);
+        Ok(())
     }
 }

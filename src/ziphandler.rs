@@ -22,15 +22,21 @@ pub(crate) struct ZipEntry {
 /// # Returns
 ///
 /// * `anyhow::Result<Vec<ZipEntry>>` - A result containing a vector of `ZipEntry`
-///   objects, or an error if the archive cannot be read or if the files within
-///   it cannot be extracted.
+///   objects, or an error if the archive cannot be opened. Individual unreadable
+///   entries are skipped with a warning on stderr.
 pub(crate) fn zip_to_zipentries(zip_path: &str) -> anyhow::Result<Vec<ZipEntry>> {
     let file = File::open(zip_path)?;
     let mut archive = ZipArchive::new(file)?;
     let mut zipentries = Vec::<ZipEntry>::new();
 
     for i in 0..archive.len() {
-        let file = archive.by_index(i)?;
+        let file = match archive.by_index(i) {
+            Ok(file) => file,
+            Err(e) => {
+                eprintln!("Skipping unreadable entry {i} in {zip_path}: {e}");
+                continue;
+            }
+        };
         let file_name = file.name();
 
         if file_name.ends_with(".docx") && !file_name.contains("__MACOSX") {
@@ -44,12 +50,11 @@ pub(crate) fn zip_to_zipentries(zip_path: &str) -> anyhow::Result<Vec<ZipEntry>>
 
     Ok(zipentries)
 }
-#[cfg(test)]
 
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::io::Write;
-    // use std::io::{self, Read};
 
     use tempfile::tempdir;
     use zip::write::SimpleFileOptions;
@@ -92,7 +97,10 @@ mod tests {
 
     #[test]
     fn test_read_test_archive() -> anyhow::Result<()> {
-        let docx_files = zip_to_zipentries("resources/TestArchive.zip")?;
+        let docx_files = zip_to_zipentries(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/resources/TestArchive.zip"
+        ))?;
         assert_eq!(docx_files.len(), 2);
         assert_eq!(docx_files[0].entry_name, "BookNotes.docx");
         assert_eq!(docx_files[1].entry_name, "testdoc.docx");

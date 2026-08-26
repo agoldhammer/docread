@@ -1,3 +1,4 @@
+use anyhow::Context;
 use clap::Parser;
 use regex::Regex;
 
@@ -25,7 +26,7 @@ struct Args {
         short,
         long,
         default_value = ".",
-        help = "top-level dir or file name to search for docx or zip files"
+        help = "top-level directory to search for docx and zip files"
     )]
     dir: String,
     #[arg(
@@ -34,7 +35,7 @@ struct Args {
         default_value = "75",
         help = "number of context chars to show before/after matches"
     )]
-    context: String,
+    context: usize,
     #[arg(short, long, help = "show file names & match status only")]
     quiet: bool,
     #[arg(short, long, help = "show search summary")]
@@ -63,13 +64,13 @@ struct Args {
 ///
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
-    let re = Regex::new(&args.regex).unwrap();
-    let n_context_chars = args.context.parse::<usize>()?;
+    let re = Regex::new(&args.regex)
+        .with_context(|| format!("Invalid regular expression: '{}'", args.regex))?;
     process_files(
         &args.dir,
         &re,
         args.quiet,
-        n_context_chars,
+        args.context,
         args.summary,
         args.unmatched_show,
     )?;

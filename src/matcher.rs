@@ -16,47 +16,35 @@ macro_rules! first_n_chars {
 macro_rules! last_n_chars {
     ($s:expr, $n:expr) => {{
         let s: &str = $s;
-        let len = s.len();
-        s.char_indices()
-            .rev()
-            .nth($n - 1)
-            .map(|(i, _)| &s[i..len])
-            .unwrap_or(s)
+        let n: usize = $n;
+        match n.checked_sub(1) {
+            Some(n_minus_1) => s
+                .char_indices()
+                .rev()
+                .nth(n_minus_1)
+                .map(|(i, _)| &s[i..])
+                .unwrap_or(s),
+            None => "",
+        }
     }};
 }
 
 #[derive(Debug)]
-pub(crate) struct MatchTriple(
-    String, //preamble
-    String, //matched
-    String, //postamble
-);
-
-impl FromIterator<String> for MatchTriple {
-    /// Creates a new `MatchTriple` from an iterator of `String`s.
-    ///
-    /// The first element of the iterator becomes the preamble, the second element
-    /// becomes the matched text, and the third element becomes the postamble.
-    ///
-    /// If the iterator does not contain enough elements, empty strings are used for
-    /// any missing elements.
-    ///
-    /// # Example
-    ///
-    ///
-    fn from_iter<T: IntoIterator<Item = String>>(iter: T) -> Self {
-        let mut iter = iter.into_iter();
-        MatchTriple(
-            iter.next().unwrap_or_default(),
-            iter.next().unwrap_or_default(),
-            iter.next().unwrap_or_default(),
-        )
-    }
+pub(crate) struct MatchTriple {
+    pub preamble: String,
+    pub matched: String,
+    pub postamble: String,
 }
 
 impl Display for MatchTriple {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}{}{}", self.0, self.1.red(), self.2)
+        write!(
+            f,
+            "{}{}{}",
+            self.preamble,
+            self.matched.red(),
+            self.postamble
+        )
     }
 }
 
@@ -67,34 +55,31 @@ impl Display for MatchTriple {
 /// element of the `MatchTriple` will be an empty string. If the regular expression matches the end
 /// of the string, the third element of the `MatchTriple` will be an empty string.
 pub(crate) fn segment_on_regex(s: &str, re: &Regex, context_len: usize) -> Vec<MatchTriple> {
-    let mut segments = Vec::new();
-    let mut start = 0;
-    let mut end;
-    let mut end_of_prev_match = 0usize;
-    for m in re.find_iter(s) {
-        end = m.start();
-        // push postamble if there is any
-        if end_of_prev_match > 0 {
-            segments.push(first_n_chars!(&s[end_of_prev_match..end], context_len).to_string());
-        }
-        // push preamble
-        segments.push(last_n_chars!(&s[start..end], context_len).to_string()); // push preamble.push(s[start..end].to_string());
-        let matched = m.as_str().to_string();
-        end_of_prev_match = m.end();
-        start = end + matched.len();
-        // push match itself
-        segments.push(matched);
+    let matches: Vec<_> = re.find_iter(s).collect();
+    let mut triples = Vec::with_capacity(matches.len());
+    let mut gap_start = 0usize;
+    for (i, m) in matches.iter().enumerate() {
+        let gap_end = matches.get(i + 1).map_or(s.len(), |next| next.start());
+        let preamble = last_n_chars!(&s[gap_start..m.start()], context_len).to_string();
+        let postamble = first_n_chars!(&s[m.end()..gap_end], context_len).to_string();
+        triples.push(MatchTriple::new(
+            preamble,
+            m.as_str().to_string(),
+            postamble,
+        ));
+        gap_start = m.end();
     }
-    if start < s.len() {
-        // push postamble of last match
-        segments.push(first_n_chars!(&s[start..], context_len).to_string()); // segments.push(s[start..].to_string());
-    }
-    let mut triples: Vec<MatchTriple> = Vec::new();
-    segments.chunks(3).for_each(|chunk| {
-        let mtriple = MatchTriple::from_iter(chunk.to_owned());
-        triples.push(mtriple);
-    });
     triples
+}
+
+impl MatchTriple {
+    fn new(preamble: String, matched: String, postamble: String) -> Self {
+        MatchTriple {
+            preamble,
+            matched,
+            postamble,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -108,9 +93,9 @@ mod tests {
         let mtriples = segment_on_regex(s, &re, 1000);
         println!("{:?}", mtriples);
         assert_eq!(mtriples.len(), 1);
-        assert_eq!(mtriples[0].0, "");
-        assert_eq!(mtriples[0].1, "Hello");
-        assert_eq!(mtriples[0].2, ", world!");
+        assert_eq!(mtriples[0].preamble, "");
+        assert_eq!(mtriples[0].matched, "Hello");
+        assert_eq!(mtriples[0].postamble, ", world!");
     }
 
     // Tests to verify the macro works correctly
@@ -122,21 +107,21 @@ mod tests {
         let mtriples = segment_on_regex(s, &re, 1000);
         println!("{:?}", mtriples);
         assert_eq!(mtriples.len(), 5);
-        assert_eq!(mtriples[0].0, "");
-        assert_eq!(mtriples[0].1, "Th");
-        assert_eq!(mtriples[0].2, "is, ");
-        assert_eq!(mtriples[1].0, "is, ");
-        assert_eq!(mtriples[1].1, "th");
-        assert_eq!(mtriples[1].2, "at, and ");
-        assert_eq!(mtriples[2].0, "at, and ");
-        assert_eq!(mtriples[2].1, "th");
-        assert_eq!(mtriples[2].2, "e o");
-        assert_eq!(mtriples[3].0, "e o");
-        assert_eq!(mtriples[3].1, "th");
-        assert_eq!(mtriples[3].2, "er ");
-        assert_eq!(mtriples[4].0, "er ");
-        assert_eq!(mtriples[4].1, "th");
-        assert_eq!(mtriples[4].2, "ing");
+        assert_eq!(mtriples[0].preamble, "");
+        assert_eq!(mtriples[0].matched, "Th");
+        assert_eq!(mtriples[0].postamble, "is, ");
+        assert_eq!(mtriples[1].preamble, "is, ");
+        assert_eq!(mtriples[1].matched, "th");
+        assert_eq!(mtriples[1].postamble, "at, and ");
+        assert_eq!(mtriples[2].preamble, "at, and ");
+        assert_eq!(mtriples[2].matched, "th");
+        assert_eq!(mtriples[2].postamble, "e o");
+        assert_eq!(mtriples[3].preamble, "e o");
+        assert_eq!(mtriples[3].matched, "th");
+        assert_eq!(mtriples[3].postamble, "er ");
+        assert_eq!(mtriples[4].preamble, "er ");
+        assert_eq!(mtriples[4].matched, "th");
+        assert_eq!(mtriples[4].postamble, "ing");
     }
 
     #[test]
@@ -171,5 +156,42 @@ mod tests {
         assert_eq!(last_n_chars!("   ", 2), "  ");
         assert_eq!(last_n_chars!("NoSpaces", 3), "ces");
         assert_eq!(last_n_chars!("Célimène", 3), "ène");
+    }
+
+    #[test]
+    fn test_last_n_chars_zero() {
+        assert_eq!(last_n_chars!("Hello", 0), "");
+        assert_eq!(first_n_chars!("Hello", 0), "");
+    }
+
+    #[test]
+    fn test_segment_on_regex_zero_length_first_match() {
+        // A zero-length first match desynchronised the old flat chunking.
+        let s = "ab";
+        let re = Regex::new("").unwrap();
+        let mtriples = segment_on_regex(s, &re, 75);
+        assert_eq!(mtriples.len(), 3);
+        assert_eq!(mtriples[0].preamble, "");
+        assert_eq!(mtriples[0].matched, "");
+        assert_eq!(mtriples[0].postamble, "a");
+        assert_eq!(mtriples[1].matched, "");
+        assert_eq!(mtriples[2].matched, "");
+    }
+
+    #[test]
+    fn test_segment_on_regex_truncated_context() {
+        let s = "abcdefghij";
+        let re = Regex::new("[ace]").unwrap();
+        let mtriples = segment_on_regex(s, &re, 2);
+        assert_eq!(mtriples.len(), 3);
+        assert_eq!(mtriples[0].preamble, "");
+        assert_eq!(mtriples[0].matched, "a");
+        assert_eq!(mtriples[0].postamble, "b");
+        assert_eq!(mtriples[1].preamble, "b");
+        assert_eq!(mtriples[1].matched, "c");
+        assert_eq!(mtriples[1].postamble, "d");
+        assert_eq!(mtriples[2].preamble, "d");
+        assert_eq!(mtriples[2].matched, "e");
+        assert_eq!(mtriples[2].postamble, "fg");
     }
 }

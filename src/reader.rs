@@ -71,7 +71,7 @@ impl ReadIntoBuf for ZipEntry {
     }
 
     fn get_fname(&self) -> String {
-        format! {"File: {} in {}", self.entry_name, self.archive_name}.clone()
+        format!("File: {} in {}", self.entry_name, self.archive_name)
     }
 }
 
@@ -87,20 +87,14 @@ impl ReadIntoBuf for ZipEntry {
 ///
 /// * `anyhow::Result<Runs>` - A result containing a vector of text runs that match the regular expression,
 ///   or an error if the parsing or reading process fails.
-#[allow(clippy::borrowed_box)]
 fn parse_docx(
-    file_like: &Box<dyn ReadIntoBuf + Send + Sync>,
+    file_like: &(dyn ReadIntoBuf + Send + Sync),
     search_re: &Regex,
 ) -> anyhow::Result<Runs> {
     let buffer = file_like.read_into_buf()?;
     let data: Value = serde_json::from_str(
         &read_docx(&buffer)
-            .with_context(|| {
-                format!(
-                    "Error decoding {}",
-                    file_like.get_fname().bright_red().on_black()
-                )
-            })?
+            .with_context(|| format!("Error decoding {}", file_like.get_fname()))?
             .json(),
     )?;
     let matched_runs = xtract_text_from_doctree(&data, search_re);
@@ -127,8 +121,7 @@ pub(crate) fn process_files(
     summary: bool,
     unmatched_show: bool,
 ) -> anyhow::Result<()> {
-    // output mutex
-    let output_mutex = Arc::new(Mutex::new(0));
+    let output_mutex = Arc::new(Mutex::new(()));
     let zip_fnames = make_fnames(base_dir, ".zip")?;
     let docx_fnames = make_fnames(base_dir, ".docx")?;
     let nfiles = docx_fnames.fnames.len();
@@ -140,16 +133,20 @@ pub(crate) fn process_files(
         }));
     }
     for zip_fname in &zip_fnames.fnames {
-        let zipentries = zip_to_zipentries(zip_fname)?;
-        for ze in zipentries {
-            file_surrogates.push(Box::new(ze));
+        match zip_to_zipentries(zip_fname) {
+            Ok(zipentries) => {
+                for ze in zipentries {
+                    file_surrogates.push(Box::new(ze));
+                }
+            }
+            Err(e) => eprintln!("Skipping unreadable zip archive {zip_fname}: {e:?}"),
         }
     }
 
     file_surrogates
         .par_iter()
         .map(|file_like| {
-            let result = parse_docx(file_like, search_re);
+            let result = parse_docx(&**file_like, search_re);
             SearchResult {
                 file_name: file_like.get_fname().to_string(),
                 maybe_result: result,
@@ -165,23 +162,23 @@ pub(crate) fn process_files(
                 unmatched_show,
             );
         });
-    let fileword = if nfiles == 1 { "file" } else { "files" };
-    let zipword = if nzips == 1 {
-        "zip archive"
-    } else {
-        "zip archives"
-    };
-    println!("Searched {nfiles} {fileword} amd {nzips} {zipword}\n");
-    println!(
-        "  Search parameters: regex: {}, base_path={:#?}\n\n",
-        search_re, base_dir
-    );
     if summary {
+        let fileword = if nfiles == 1 { "file" } else { "files" };
+        let zipword = if nzips == 1 {
+            "zip archive"
+        } else {
+            "zip archives"
+        };
+        println!("Searched {nfiles} {fileword} and {nzips} {zipword}\n");
+        println!(
+            "  Search parameters: regex: {}, base_path={base_dir}\n\n",
+            search_re
+        );
         for fname in &docx_fnames.fnames {
-            println!("Searched docx file  {}", fname);
+            println!("Searched docx file  {fname}");
         }
         for fname in &zip_fnames.fnames {
-            println!("Searched zip archive  {}", fname);
+            println!("Searched zip archive  {fname}");
         }
     }
     Ok(())
@@ -206,15 +203,18 @@ fn print_result(
     result: &SearchResult,
     re: &Regex,
     quiet: bool,
-    output_mutex: Arc<Mutex<u32>>,
+    output_mutex: Arc<Mutex<()>>,
     n_context_chars: usize,
     unmatched_show: bool,
 ) {
     let _output_guard = output_mutex.lock().unwrap();
     match &result.maybe_result {
         Ok(runs) => {
+            if runs.is_empty() && !unmatched_show {
+                return;
+            }
+            println!("Searched file--> {}\n", result.file_name.bright_red());
             if quiet {
-                println!("Searched file--> {}\n", result.file_name.bright_red());
                 if !runs.is_empty() {
                     let runs_len = format!("Matched {} runs", runs.len())
                         .bright_green()
@@ -225,10 +225,6 @@ fn print_result(
                     println!("{not_found}\n");
                 }
             } else {
-                if runs.is_empty() && !unmatched_show {
-                    return;
-                }
-                println!("Searched file--> {}\n", result.file_name.bright_red());
                 for (run_index, run) in runs.iter().enumerate() {
                     let mtriples = matcher::segment_on_regex(run, re, n_context_chars);
                     for (match_index, mtriple) in mtriples.iter().enumerate() {
@@ -239,7 +235,7 @@ fn print_result(
             }
             println!("===\n");
         }
-        Err(e) => eprintln!("{:?}\n", e),
+        Err(e) => eprintln!("{}", format!("{e:?}\n").bright_red()),
     }
 }
 
@@ -264,9 +260,10 @@ fn xtract_text_from_doctree(root: &Value, search_re: &Regex) -> Runs {
     }
     while let Some(child) = queue.pop_front() {
         if child["type"] == "text" {
-            let text = child["data"]["text"].as_str().unwrap();
-            if search_re.is_match(text) {
-                matching_runs.push(text.to_string());
+            if let Some(text) = child["data"]["text"].as_str() {
+                if search_re.is_match(text) {
+                    matching_runs.push(text.to_string());
+                }
             }
         } else if let Some(children) = child["data"]["children"].as_array() {
             for child in children {
