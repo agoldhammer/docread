@@ -109,4 +109,56 @@ mod tests {
         }
         Ok(())
     }
+
+    #[test]
+    fn test_zip_to_zipentries_no_docx_entries() -> anyhow::Result<()> {
+        let dir = tempdir()?;
+        let zip_path = dir.path().join("nodocx.zip");
+        let file = File::create(&zip_path)?;
+        let mut zip = ZipWriter::new(file);
+        let options =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("readme.txt", options)?;
+        zip.write_all(b"nothing docx-ish here")?;
+        zip.finish()?;
+
+        let entries = zip_to_zipentries(zip_path.to_str().unwrap())?;
+        assert!(entries.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_zip_to_zipentries_missing_archive_errors() {
+        assert!(zip_to_zipentries("does/not/exist.zip").is_err());
+    }
+
+    #[test]
+    fn test_zip_to_zipentries_skips_macosx_and_directory_entries() -> anyhow::Result<()> {
+        // macOS metadata files and a directory literally named "notes.docx/"
+        // must not be reported as docx entries; nested docx paths must be.
+        let dir = tempdir()?;
+        let zip_path = dir.path().join("mixed.zip");
+        let file = File::create(&zip_path)?;
+        let mut zip = ZipWriter::new(file);
+        let options =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        zip.add_directory("__MACOSX/", options)?;
+        zip.start_file("__MACOSX/._real.docx", options)?;
+        zip.write_all(b"macos metadata")?;
+        zip.add_directory("notes.docx/", options)?;
+        zip.start_file("real.docx", options)?;
+        zip.write_all(b"docx data")?;
+        zip.start_file("sub/nested.docx", options)?;
+        zip.write_all(b"docx data 2")?;
+        zip.finish()?;
+
+        let entries = zip_to_zipentries(zip_path.to_str().unwrap())?;
+        let names: Vec<&str> = entries.iter().map(|e| e.entry_name.as_str()).collect();
+        assert_eq!(names, vec!["real.docx", "sub/nested.docx"]);
+        let archive = zip_path.to_str().unwrap();
+        for e in &entries {
+            assert_eq!(e.archive_name, archive);
+        }
+        Ok(())
+    }
 }

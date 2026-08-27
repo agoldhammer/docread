@@ -278,6 +278,11 @@ fn xtract_text_from_doctree(root: &Value, search_re: &Regex) -> Runs {
 mod tests {
     use super::*;
 
+    use std::fs::File;
+    use std::io::Write as _;
+
+    use tempfile::tempdir;
+
     #[test]
     fn test_xtract_text_from_doctree() {
         let data = r#"
@@ -302,6 +307,64 @@ mod tests {
     }
 
     #[test]
+    fn test_xtract_text_from_doctree_nested_children() {
+        // Text buried under non-text container nodes must still be found.
+        let data = r#"
+        {
+            "document": {
+                "children": [
+                    { "type": "table", "data": { "children": [
+                        { "type": "tableRow", "data": { "children": [
+                            { "type": "tableCell", "data": { "children": [
+                                { "type": "paragraph", "data": { "children": [
+                                    { "type": "run", "data": { "children": [
+                                        { "type": "text", "data": { "text": "deeply nested match" } }
+                                    ] } }
+                                ] } }
+                            ] } }
+                        ] } }
+                    ] } }
+                ]
+            }
+        }"#;
+        let root: Value = serde_json::from_str(data).unwrap();
+        let runs = xtract_text_from_doctree(&root, &Regex::new("nested").unwrap());
+        assert_eq!(runs, vec!["deeply nested match"]);
+    }
+
+    #[test]
+    fn test_xtract_text_from_doctree_missing_document_key() {
+        let root: Value = serde_json::from_str(r#"{"other": {}}"#).unwrap();
+        assert!(xtract_text_from_doctree(&root, &Regex::new(".*").unwrap()).is_empty());
+    }
+
+    #[test]
+    fn test_xtract_text_from_doctree_keeps_order_skips_non_matching() {
+        let data = r#"
+        { "document": { "children": [
+            { "type": "text", "data": { "text": "match one" } },
+            { "type": "text", "data": { "text": "nope" } },
+            { "type": "text", "data": { "text": "match two" } }
+        ] } }"#;
+        let root: Value = serde_json::from_str(data).unwrap();
+        let runs = xtract_text_from_doctree(&root, &Regex::new("match").unwrap());
+        assert_eq!(runs, vec!["match one", "match two"]);
+    }
+
+    #[test]
+    fn test_xtract_text_from_doctree_ignores_non_text_nodes() {
+        // A node that is neither a text node nor a container is skipped.
+        let data = r#"
+        { "document": { "children": [
+            { "type": "tab", "data": {} },
+            { "type": "text", "data": { "text": "the text" } }
+        ] } }"#;
+        let root: Value = serde_json::from_str(data).unwrap();
+        let runs = xtract_text_from_doctree(&root, &Regex::new("text").unwrap());
+        assert_eq!(runs, vec!["the text"]);
+    }
+
+    #[test]
     fn test_zip_entry_name() {
         let zip_entry = ZipEntry {
             archive_name: "test.zip".to_string(),
@@ -318,5 +381,188 @@ mod tests {
             Ok(_) => panic!("Expected an error"),
             Err(e) => assert_eq!(e.to_string(), "Failed to open file: nonexistent.docx"),
         }
+    }
+
+    #[test]
+    fn test_read_to_vec_success() -> anyhow::Result<()> {
+        let dir = tempdir()?;
+        let path = dir.path().join("data.bin");
+        std::fs::write(&path, b"some bytes")?;
+
+        let buf = read_to_vec(path.to_str().unwrap())?;
+        assert_eq!(buf, b"some bytes");
+        Ok(())
+    }
+
+    #[test]
+    fn test_regular_file_from_and_fname() {
+        let file = RegularFile::from("a/b.docx");
+        assert_eq!(file.get_fname(), "a/b.docx");
+        assert!(file.read_into_buf().is_err());
+    }
+
+    #[test]
+    fn test_parse_docx_extracts_matching_runs() -> anyhow::Result<()> {
+        let dir = tempdir()?;
+        let path = dir.path().join("doc.docx");
+        fixtures::make_docx(&path, &["Hello, world!", "Nothing to see", "hello again"])?;
+        let file = RegularFile::from(path.to_str().unwrap());
+
+        let runs = parse_docx(&file, &Regex::new("[Hh]ello").unwrap())?;
+        assert_eq!(runs, vec!["Hello, world!", "hello again"]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_docx_no_matches() -> anyhow::Result<()> {
+        let dir = tempdir()?;
+        let path = dir.path().join("doc.docx");
+        fixtures::make_docx(&path, &["nothing to find"])?;
+        let file = RegularFile::from(path.to_str().unwrap());
+
+        assert!(parse_docx(&file, &Regex::new("xyz").unwrap())?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_docx_pattern_spanning_runs_does_not_match() -> anyhow::Result<()> {
+        // A pattern spanning two runs must not match (documented limitation).
+        let dir = tempdir()?;
+        let path = dir.path().join("split.docx");
+        fixtures::make_docx_with_runs(&path, &[&["Hel", "lo"]])?;
+        let file = RegularFile::from(path.to_str().unwrap());
+
+        assert!(parse_docx(&file, &Regex::new("Hello").unwrap())?.is_empty());
+        let runs = parse_docx(&file, &Regex::new("Hel").unwrap())?;
+        assert_eq!(runs, vec!["Hel"]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_docx_unescapes_xml_entities() -> anyhow::Result<()> {
+        let dir = tempdir()?;
+        let path = dir.path().join("special.docx");
+        fixtures::make_docx(&path, &["AT&T <Inc> & friends"])?;
+        let file = RegularFile::from(path.to_str().unwrap());
+
+        let runs = parse_docx(&file, &Regex::new("AT&T").unwrap())?;
+        assert_eq!(runs, vec!["AT&T <Inc> & friends"]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_docx_corrupted_file_errors() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("bad.docx");
+        std::fs::write(&path, b"this is not a zip archive").unwrap();
+        let file = RegularFile::from(path.to_str().unwrap());
+
+        assert!(parse_docx(&file, &Regex::new("a").unwrap()).is_err());
+    }
+
+    #[test]
+    fn test_zip_entry_read_into_buf_and_parse() -> anyhow::Result<()> {
+        let dir = tempdir()?;
+        let docx_path = dir.path().join("inner.docx");
+        fixtures::make_docx(&docx_path, &["zipped text"])?;
+        let docx_bytes = std::fs::read(&docx_path)?;
+
+        let zip_path = dir.path().join("outer.zip");
+        let file = File::create(&zip_path)?;
+        let mut zip = zip::ZipWriter::new(file);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("inner.docx", options)?;
+        zip.write_all(&docx_bytes)?;
+        zip.finish()?;
+
+        let entry = ZipEntry {
+            archive_name: zip_path.to_str().unwrap().to_string(),
+            entry_name: "inner.docx".to_string(),
+        };
+        let buf = entry.read_into_buf()?;
+        assert_eq!(buf, docx_bytes);
+        let runs = parse_docx(&entry, &Regex::new("zipped").unwrap())?;
+        assert_eq!(runs, vec!["zipped text"]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_zip_entry_missing_entry_errors() -> anyhow::Result<()> {
+        let dir = tempdir()?;
+        let zip_path = dir.path().join("outer.zip");
+        let file = File::create(&zip_path)?;
+        let mut zip = zip::ZipWriter::new(file);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("a.txt", options)?;
+        zip.write_all(b"unrelated")?;
+        zip.finish()?;
+
+        let entry = ZipEntry {
+            archive_name: zip_path.to_str().unwrap().to_string(),
+            entry_name: "nope.docx".to_string(),
+        };
+        assert!(entry.read_into_buf().is_err());
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod fixtures {
+    //! Builds minimal .docx packages (the zip parts docx-rs requires) so that
+    //! tests do not depend on hand-made resource files.
+
+    use std::fs::File;
+    use std::io::Write as _;
+    use std::path::Path;
+
+    fn xml_escape(s: &str) -> String {
+        s.replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;")
+            .replace('"', "&quot;")
+    }
+
+    /// Writes a minimal .docx to `path` whose body holds the given single-run paragraphs.
+    pub fn make_docx(path: &Path, paragraphs: &[&str]) -> std::io::Result<()> {
+        let paras: Vec<&[&str]> = paragraphs.iter().map(std::slice::from_ref).collect();
+        make_docx_with_runs(path, &paras)
+    }
+
+    /// Writes a minimal .docx to `path`; each entry of `paragraphs` is a paragraph
+    /// consisting of one run per text fragment.
+    pub fn make_docx_with_runs(path: &Path, paragraphs: &[&[&str]]) -> std::io::Result<()> {
+        let mut body = String::new();
+        for runs in paragraphs.iter() {
+            for run in *runs {
+                body.push_str(&format!(
+                    "<w:p><w:r><w:t xml:space=\"preserve\">{}</w:t></w:r></w:p>",
+                    xml_escape(run)
+                ));
+            }
+        }
+        let document_xml = format!(
+            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{}</w:body></w:document>"#,
+            body
+        );
+        const CONTENT_TYPES: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>"#;
+        const RELS: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
+        const DOC_RELS: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>"#;
+
+        let file = File::create(path)?;
+        let mut zip = zip::ZipWriter::new(file);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("[Content_Types].xml", options)?;
+        zip.write_all(CONTENT_TYPES.as_bytes())?;
+        zip.start_file("_rels/.rels", options)?;
+        zip.write_all(RELS.as_bytes())?;
+        zip.start_file("word/document.xml", options)?;
+        zip.write_all(document_xml.as_bytes())?;
+        zip.start_file("word/_rels/document.xml.rels", options)?;
+        zip.write_all(DOC_RELS.as_bytes())?;
+        zip.finish()?;
+        Ok(())
     }
 }

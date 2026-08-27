@@ -194,4 +194,117 @@ mod tests {
         assert_eq!(mtriples[2].matched, "e");
         assert_eq!(mtriples[2].postamble, "fg");
     }
+
+    #[test]
+    fn test_segment_on_regex_no_matches() {
+        let s = "no matches in here";
+        let re = Regex::new("xyz").unwrap();
+        assert!(segment_on_regex(s, &re, 75).is_empty());
+    }
+
+    #[test]
+    fn test_segment_on_regex_empty_input() {
+        let re = Regex::new("a").unwrap();
+        assert!(segment_on_regex("", &re, 75).is_empty());
+
+        // An empty pattern still matches once, at position 0.
+        let zero = Regex::new("").unwrap();
+        let mtriples = segment_on_regex("", &zero, 75);
+        assert_eq!(mtriples.len(), 1);
+        assert_eq!(mtriples[0].preamble, "");
+        assert_eq!(mtriples[0].matched, "");
+        assert_eq!(mtriples[0].postamble, "");
+    }
+
+    #[test]
+    fn test_segment_on_regex_match_at_end() {
+        let s = "the end";
+        let re = Regex::new("end").unwrap();
+        let mtriples = segment_on_regex(s, &re, 75);
+        assert_eq!(mtriples.len(), 1);
+        assert_eq!(mtriples[0].preamble, "the ");
+        assert_eq!(mtriples[0].matched, "end");
+        assert_eq!(mtriples[0].postamble, "");
+    }
+
+    #[test]
+    fn test_segment_on_regex_whole_string_match() {
+        let s = "hello";
+        let re = Regex::new(".*").unwrap();
+        let mtriples = segment_on_regex(s, &re, 75);
+        assert_eq!(mtriples.len(), 1);
+        assert_eq!(mtriples[0].preamble, "");
+        assert_eq!(mtriples[0].matched, "hello");
+        assert_eq!(mtriples[0].postamble, "");
+    }
+
+    #[test]
+    fn test_segment_on_regex_zero_context() {
+        let s = "abcdefghij";
+        let re = Regex::new("e").unwrap();
+        let mtriples = segment_on_regex(s, &re, 0);
+        assert_eq!(mtriples.len(), 1);
+        assert_eq!(mtriples[0].preamble, "");
+        assert_eq!(mtriples[0].matched, "e");
+        assert_eq!(mtriples[0].postamble, "");
+    }
+
+    #[test]
+    fn test_segment_on_regex_preamble_truncated() {
+        let s = "abcdefghij";
+        let re = Regex::new("e").unwrap();
+        let mtriples = segment_on_regex(s, &re, 2);
+        assert_eq!(mtriples[0].preamble, "cd");
+        assert_eq!(mtriples[0].postamble, "fg");
+    }
+
+    #[test]
+    fn test_segment_on_regex_adjacent_matches() {
+        let s = "aaaa";
+        let re = Regex::new("a").unwrap();
+        let mtriples = segment_on_regex(s, &re, 75);
+        assert_eq!(mtriples.len(), 4);
+        for m in &mtriples {
+            assert_eq!(m.preamble, "");
+            assert_eq!(m.matched, "a");
+            assert_eq!(m.postamble, "");
+        }
+    }
+
+    #[test]
+    fn test_segment_on_regex_alternating_matches_with_gaps() {
+        let s = "aXbYc";
+        let re = Regex::new("[XY]").unwrap();
+        let mtriples = segment_on_regex(s, &re, 10);
+        assert_eq!(mtriples.len(), 2);
+        assert_eq!(mtriples[0].preamble, "a");
+        assert_eq!(mtriples[0].matched, "X");
+        assert_eq!(mtriples[0].postamble, "b");
+        assert_eq!(mtriples[1].preamble, "b");
+        assert_eq!(mtriples[1].matched, "Y");
+        assert_eq!(mtriples[1].postamble, "c");
+    }
+
+    #[test]
+    fn test_segment_on_regex_truncates_at_char_boundaries() {
+        // The context window must not cut a multi-byte character in half.
+        let s = "🦀🦀🦀 x";
+        let re = Regex::new("x").unwrap();
+        let mtriples = segment_on_regex(s, &re, 2);
+        assert_eq!(mtriples[0].preamble, "🦀 ");
+        assert_eq!(mtriples[0].postamble, "");
+    }
+
+    #[test]
+    fn test_match_triple_display() {
+        let m = MatchTriple::new("pre ".to_string(), "HELLO".to_string(), " post".to_string());
+        colored::control::set_override(false);
+        assert_eq!(format!("{m}"), "pre HELLO post");
+        colored::control::set_override(true);
+        let colored_out = format!("{m}");
+        colored::control::set_override(false);
+        assert!(colored_out.starts_with("pre "));
+        assert!(colored_out.ends_with(" post"));
+        assert!(colored_out.contains("\u{1b}[31mHELLO\u{1b}[0m"));
+    }
 }

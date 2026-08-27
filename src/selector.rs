@@ -53,4 +53,54 @@ mod tests {
         assert_eq!(f.fnames.len(), 2);
         Ok(())
     }
+
+    #[test]
+    fn test_make_fnames_no_matches_returns_empty() -> anyhow::Result<()> {
+        let dir = tempdir()?;
+        File::create(dir.path().join("notes.txt"))?;
+
+        let f = make_fnames(dir.path().to_str().unwrap(), ".docx")?;
+        assert!(f.fnames.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_make_fnames_missing_dir_is_empty_not_error() -> anyhow::Result<()> {
+        let f = make_fnames("/definitely/not/a/real/dir", ".docx")?;
+        assert!(f.fnames.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_make_fnames_trailing_slash_matches_without() -> anyhow::Result<()> {
+        let dir = tempdir()?;
+        File::create(dir.path().join("a.docx"))?;
+        let base = dir.path().to_str().unwrap();
+
+        let plain = make_fnames(base, ".docx")?.fnames;
+        let slashed = make_fnames(&format!("{base}/"), ".docx")?.fnames;
+        assert_eq!(plain, slashed);
+        assert_eq!(plain.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn test_make_fnames_filters_by_suffix_only() -> anyhow::Result<()> {
+        let dir = tempdir()?;
+        File::create(dir.path().join("a.docx"))?;
+        File::create(dir.path().join("b.docx.txt"))?;
+        File::create(dir.path().join("c.docx2"))?;
+        File::create(dir.path().join("d.DOCX"))?;
+
+        let f = make_fnames(dir.path().to_str().unwrap(), ".docx")?;
+        assert_eq!(f.fnames.len(), 1);
+        assert!(f.fnames[0].ends_with("a.docx"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_make_fnames_invalid_pattern_is_error() {
+        // "[**/*.docx" contains an unclosed character class, which the glob crate rejects.
+        assert!(make_fnames("[", ".docx").is_err());
+    }
 }
